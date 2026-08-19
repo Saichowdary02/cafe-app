@@ -1,18 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
     const router = useRouter();
 
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+
+        const userData = localStorage.getItem("user");
+
+        if (userData) {
+
+            try {
+                setUser(JSON.parse(userData));
+            } catch (error) {
+                console.error(error);
+            }
+
+        }
+
+    }, []);
+
+
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-         localStorage.removeItem("cart"); 
+        localStorage.removeItem("cart");
 
         router.push("/login");
     };
+
+
+    const isAdmin = user?.role === "ADMIN";
+
 
     return (
         <header className="border-b bg-white">
@@ -47,12 +71,23 @@ export default function Navbar() {
                     >
                         Orders
                     </Link>
+
                     <Link
-                            href="/cart"
-                            className="text-gray-700 hover:text-orange-600"
+                        href="/cart"
+                        className="text-gray-700 hover:text-orange-600"
                     >
-                            Cart
+                        Cart
                     </Link>
+
+                    {/* ADMIN ONLY */}
+                    {isAdmin && (
+                        <Link
+                            href="/manage-products"
+                            className="text-gray-700 hover:text-orange-600"
+                        >
+                            Manage Products
+                        </Link>
+                    )}
 
                     <button
                         onClick={handleLogout}
