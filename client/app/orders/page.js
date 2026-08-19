@@ -4,22 +4,57 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
-const STATUS_STYLES = {
-    PENDING: "bg-orange-100 text-orange-700",
-    PREPARING: "bg-blue-100 text-blue-700",
-    COMPLETED: "bg-green-100 text-green-700",
-};
-
 function StatusBadge({ status }) {
+    if (status === "PENDING") {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-xs font-bold tracking-wide text-amber-800 shadow-xs">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                PENDING
+            </span>
+        );
+    }
+    if (status === "PREPARING") {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 bg-blue-50 px-3 py-1 text-xs font-bold tracking-wide text-blue-800 shadow-xs">
+                <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                </span>
+                PREPARING
+            </span>
+        );
+    }
+    if (status === "COMPLETED") {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-xs font-bold tracking-wide text-emerald-800 shadow-xs">
+                <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                COMPLETED
+            </span>
+        );
+    }
     return (
-        <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                STATUS_STYLES[status] || "bg-gray-100 text-gray-700"
-            }`}
-        >
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700">
             {status}
         </span>
     );
+}
+
+function formatToIST(utcTimestamp) {
+    if (!utcTimestamp) return "";
+
+    const date = new Date(utcTimestamp);
+
+    return date.toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
 }
 
 export default function OrdersPage() {
@@ -148,7 +183,7 @@ export default function OrdersPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
                 <Navbar />
                 <main className="mx-auto max-w-7xl px-6 py-10">
                     <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
@@ -161,7 +196,7 @@ export default function OrdersPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
                 <Navbar />
                 <main className="mx-auto max-w-7xl px-6 py-10">
                     <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
@@ -175,7 +210,7 @@ export default function OrdersPage() {
 
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen">
 
             <Navbar />
 
@@ -206,112 +241,156 @@ export default function OrdersPage() {
 
                 ) : (
 
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-7 md:grid-cols-2 xl:grid-cols-3">
 
                         {orders.map((order) => (
 
                             <div
                                 key={order.id}
-                                className="flex flex-col rounded-2xl border bg-white p-6 shadow-sm"
+                                className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white/95 p-6 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-orange-300/80 hover:shadow-xl hover:shadow-orange-950/5"
                             >
-
-                                {/* Card header */}
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-bold text-gray-900">
-                                        Order #{order.id}
-                                    </h2>
-                                    <StatusBadge status={order.status} />
-                                </div>
-
-
-                                {/* Customer info — STAFF / ADMIN only */}
-                                {isStaffOrAdmin && (
-                                    <div className="mt-4">
-                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                            Customer
-                                        </p>
-                                        <p className="mt-1 text-sm text-gray-900">
-                                            {order.user_name}
-                                        </p>
-                                        <p className="text-sm text-gray-600">
-                                            {order.user_email}
-                                        </p>
-                                    </div>
-                                )}
-
-
-                                <hr className="my-4 border-gray-100" />
-
-
-                                {/* Items */}
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        Items
-                                    </p>
-
-                                    <div className="mt-2 space-y-1.5">
-                                        {order.items?.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className="flex justify-between text-sm text-gray-700"
-                                            >
-                                                <span>
-                                                    {item.product_name || item.name}
-                                                    <span className="text-gray-400"> × {item.quantity}</span>
-                                                </span>
-                                                <span className="font-medium text-gray-900">
-                                                    ₹{item.price}
-                                                </span>
+                                    {/* Card Header */}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-orange-200/70 bg-orange-50 font-extrabold text-sm text-orange-600 shadow-2xs">
+                                                #{order.id}
                                             </div>
-                                        ))}
+                                            <div>
+                                                <h2 className="text-base font-bold text-gray-900">
+                                                    Order #{order.id}
+                                                </h2>
+                                                {order.created_at && (
+                                                    <p className="text-[11px] font-medium text-stone-400">
+                                                        {formatToIST(order.created_at)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <StatusBadge status={order.status} />
+                                    </div>
+
+
+                                    {/* Customer info — STAFF / ADMIN only */}
+                                    {isStaffOrAdmin && (
+                                        <div className="mt-4 rounded-xl border border-stone-100 bg-stone-50/80 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                                                Customer
+                                            </p>
+                                            <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                                                {order.user_name}
+                                            </p>
+                                            <p className="text-xs text-stone-500">
+                                                {order.user_email}
+                                            </p>
+                                        </div>
+                                    )}
+
+
+                                    {/* Items Container */}
+                                    <div className="mt-4">
+                                        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                                            Items ({order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || order.items?.length || 0})
+                                        </p>
+
+                                        <div className="space-y-2 rounded-xl border border-stone-100/90 bg-stone-50/60 p-3.5">
+                                            {order.items?.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="flex items-center justify-between text-sm text-stone-700"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="flex h-5 min-w-5 items-center justify-center rounded-md border border-stone-200/80 bg-white px-1 text-[11px] font-bold text-orange-600 shadow-2xs">
+                                                            {item.quantity}×
+                                                        </span>
+                                                        <span className="font-medium text-stone-800">
+                                                            {item.product_name || item.name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-bold text-gray-900">
+                                                        ₹{Number(item.price).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
 
-                                <hr className="my-4 border-gray-100" />
+                                <div>
+                                    {/* Total */}
+                                    <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
+                                        <div>
+                                            <span className="block text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+                                                Total Amount
+                                            </span>
+                                            <span className="text-2xl font-extrabold text-gray-900">
+                                                ₹{Number(order.total_amount).toFixed(2)}
+                                            </span>
+                                        </div>
 
-
-                                {/* Total */}
-                                <div className="flex justify-between">
-                                    <span className="font-semibold text-gray-900">Total</span>
-                                    <span className="font-bold text-gray-900">
-                                        ₹{order.total_amount}
-                                    </span>
-                                </div>
-
-
-                                {/* Actions — STAFF / ADMIN only */}
-                                {isStaffOrAdmin && (
-                                    <div className="mt-5">
-
-                                        {order.status === "PENDING" && (
-                                            <button
-                                                onClick={() => updateStatus(order.id, "PREPARING")}
-                                                disabled={updatingId === order.id}
-                                                className="w-full rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                                            >
-                                                {updatingId === order.id ? "Updating..." : "Accept Order"}
-                                            </button>
+                                        {!isStaffOrAdmin && (
+                                            <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-600">
+                                                {order.items?.length} {order.items?.length === 1 ? "item" : "items"}
+                                            </span>
                                         )}
-
-                                        {order.status === "PREPARING" && (
-                                            <button
-                                                onClick={() => updateStatus(order.id, "COMPLETED")}
-                                                disabled={updatingId === order.id}
-                                                className="w-full rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                                            >
-                                                {updatingId === order.id ? "Updating..." : "Mark as Completed"}
-                                            </button>
-                                        )}
-
-                                        {order.status === "COMPLETED" && (
-                                            <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 px-5 py-2.5 text-sm font-semibold text-green-700">
-                                                ✓ Order Completed
-                                            </div>
-                                        )}
-
                                     </div>
-                                )}
+
+
+                                    {/* Actions — STAFF / ADMIN only */}
+                                    {isStaffOrAdmin && (
+                                        <div className="mt-4">
+
+                                            {order.status === "PENDING" && (
+                                                <button
+                                                    onClick={() => updateStatus(order.id, "PREPARING")}
+                                                    disabled={updatingId === order.id}
+                                                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-md hover:shadow-orange-500/30 active:translate-y-0 active:scale-95 disabled:opacity-50"
+                                                >
+                                                    {updatingId === order.id ? (
+                                                        "Updating..."
+                                                    ) : (
+                                                        <>
+                                                            <span>Accept Order</span>
+                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                                            </svg>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {order.status === "PREPARING" && (
+                                                <button
+                                                    onClick={() => updateStatus(order.id, "COMPLETED")}
+                                                    disabled={updatingId === order.id}
+                                                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/30 active:translate-y-0 active:scale-95 disabled:opacity-50"
+                                                >
+                                                    {updatingId === order.id ? (
+                                                        "Updating..."
+                                                    ) : (
+                                                        <>
+                                                            <span>Mark as Completed</span>
+                                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {order.status === "COMPLETED" && (
+                                                <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-5 py-2.5 text-sm font-bold text-emerald-700">
+                                                    <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Order Completed</span>
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    )}
+                                </div>
 
                             </div>
 

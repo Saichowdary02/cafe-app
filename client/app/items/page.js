@@ -25,6 +25,8 @@ export default function ItemsPage() {
     const [error, setError] = useState("");
 
     const [cart, setCart] = useState([]);
+    const [recentlyAddedId, setRecentlyAddedId] = useState(null);
+    const [toastMessage, setToastMessage] = useState("");
 
 
 
@@ -214,6 +216,18 @@ export default function ItemsPage() {
 
     );
 
+    // Visual feedback
+    setRecentlyAddedId(product.id);
+    setToastMessage(`Added "${product.name}" to cart! 🛒`);
+
+    setTimeout(() => {
+        setRecentlyAddedId(null);
+    }, 1200);
+
+    setTimeout(() => {
+        setToastMessage("");
+    }, 2500);
+
 };
 
 
@@ -228,7 +242,7 @@ export default function ItemsPage() {
 
 
 
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
 
 
 
@@ -392,141 +406,117 @@ export default function ItemsPage() {
 
 
 
-
-
-                                        {/* Products */}
-
-
-
-                                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-
-
-
-                                            {categoryProducts.map((product) => (
-
-
-
-                                                <div
-
-                                                    key={product.id}
-
-                                                    className="overflow-hidden rounded-xl border bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
-
-                                                >
-
-
-
-                                                    {/* Product Image */}
-
-
-
-                                                    {product.image ? (
-
-
-
-                                                        <img
-
-                                                            src={product.image}
-
-                                                            alt={product.name}
-
-                                                            className="h-56 w-full object-cover"
-
-                                                        />
-
-
-
-                                                    ) : (
-
-
-
-                                                        <div className="flex h-56 w-full items-center justify-center bg-gray-100 text-6xl">
-
-                                                            ☕
-
-                                                        </div>
-
-
-
-                                                    )}
-
-
-
-
-
-                                                    {/* Product Details */}
-
-
-
-                                                    <div className="p-5">
-
-
-
-                                                        <p className="text-sm font-medium text-orange-600">
-
-                                                            {product.category}
-
-                                                        </p>
-
-
-
-
-
-                                                        <h3 className="mt-1 text-lg font-semibold text-gray-900">
-
-                                                            {product.name}
-
-                                                        </h3>
-
-
-
-
-
-                                                        <div className="mt-5 flex items-center justify-between">
-
-
-
-                                                            <span className="text-xl font-bold text-gray-900">
-
-                                                                ₹{Number(product.price).toFixed(2)}
-
+                                        {/* Products Grid */}
+                                        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                            {categoryProducts.map((product) => {
+                                                const cartItem = cart.find((item) => item.id === product.id);
+                                                const isRecentlyAdded = recentlyAddedId === product.id;
+
+                                                return (
+                                                    <div
+                                                        key={product.id}
+                                                        className="group relative flex flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white/95 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-orange-300 hover:shadow-xl hover:shadow-orange-950/5"
+                                                    >
+                                                        {/* Product Image Area with Zoom & Badges */}
+                                                        <div className="relative h-52 w-full overflow-hidden bg-stone-100/70">
+                                                            {product.image ? (
+                                                                <img
+                                                                    src={product.image}
+                                                                    alt={product.name}
+                                                                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                                                                />
+                                                            ) : (
+                                                                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100/60 text-5xl">
+                                                                    {category === "Coffee" ? "☕" : category === "Chai" ? "🍵" : "🥐"}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Floating Category Pill */}
+                                                            <span className="absolute top-3 left-3 rounded-full border border-stone-200/60 bg-white/90 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-stone-700 shadow-sm backdrop-blur-md">
+                                                                {product.category}
                                                             </span>
 
-
-
-                                                        <button
-
-                                                            onClick={() => addToCart(product)}
-
-                                                            className="rounded-lg bg-orange-600 px-4 py-2 font-medium text-white transition hover:bg-orange-700"
-
-                                                        >
-
-                                                            Add
-
-                                                        </button>
-
-
-
+                                                            {/* In-Cart Pill */}
+                                                            {cartItem && (
+                                                                <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-orange-600 px-2.5 py-0.5 text-xs font-bold text-white shadow-md shadow-orange-600/30 animate-in fade-in">
+                                                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                    <span>{cartItem.quantity} in cart</span>
+                                                                </span>
+                                                            )}
                                                         </div>
 
+                                                        {/* Product Details */}
+                                                        <div className="flex flex-1 flex-col justify-between p-5">
+                                                            <div>
+                                                                <h3 className="text-base font-bold text-gray-900 transition-colors group-hover:text-orange-600">
+                                                                    {product.name}
+                                                                </h3>
+                                                            </div>
 
+                                                            <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3">
+                                                                <div>
+                                                                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+                                                                        Price
+                                                                    </span>
+                                                                    <span className="text-xl font-extrabold text-gray-900">
+                                                                        ₹{Number(product.price).toFixed(2)}
+                                                                    </span>
+                                                                </div>
 
+                                                                <button
+                                                                    onClick={() => addToCart(product)}
+                                                                    className={`group/btn inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-all duration-200 ease-in-out hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${
+                                                                        isRecentlyAdded
+                                                                            ? "bg-emerald-600 text-white shadow-emerald-500/25 hover:bg-emerald-700"
+                                                                            : "bg-orange-600 text-white shadow-orange-500/25 hover:bg-orange-700 hover:shadow-md hover:shadow-orange-500/30"
+                                                                    }`}
+                                                                >
+                                                                    {isRecentlyAdded ? (
+                                                                        <>
+                                                                            <svg
+                                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                                className="h-4 w-4"
+                                                                                fill="none"
+                                                                                viewBox="0 0 24 24"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth={2.5}
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M5 13l4 4L19 7"
+                                                                                />
+                                                                            </svg>
+                                                                            <span>Added!</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <svg
+                                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                                className="h-4 w-4 transition-transform duration-200 group-hover/btn:scale-125"
+                                                                                fill="none"
+                                                                                viewBox="0 0 24 24"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth={2.5}
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M12 4.5v15m7.5-7.5h-15"
+                                                                                />
+                                                                            </svg>
+                                                                            <span>{cartItem ? `Add (${cartItem.quantity})` : "Add"}</span>
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
-
-
-
-                                                </div>
-
-
-
-                                            ))}
-
-
-
+                                                );
+                                            })}
                                         </div>
-
-
 
                                     </section>
 
@@ -588,7 +578,15 @@ export default function ItemsPage() {
 
             </div>
 
-
+            {/* Floating Toast Notification */}
+            {toastMessage && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-stone-700/50 bg-gray-900/95 px-5 py-3.5 text-white shadow-2xl backdrop-blur-md transition-all duration-300">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
+                        ✓
+                    </span>
+                    <p className="text-sm font-medium">{toastMessage}</p>
+                </div>
+            )}
 
         </ProtectedRoute>
 

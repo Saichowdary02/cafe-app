@@ -12,9 +12,9 @@ export default function OrderSuccessPage() {
 
     return (
 
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="min-h-screen flex items-center justify-center px-6">
 
-            <div className="w-full max-w-md rounded-2xl border bg-white p-8 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-2xl border border-stone-200/80 bg-white/95 p-8 text-center shadow-xl shadow-amber-900/5 backdrop-blur-sm">
 
                 {/* Success Icon */}
 

@@ -30,7 +30,7 @@ const FEATURES = [
 export default function HomePage() {
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
 
                 <Navbar />
 
@@ -52,20 +52,34 @@ export default function HomePage() {
                             and place your order easily.
                         </p>
 
-                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
 
                             <Link
                                 href="/items"
-                                className="rounded-lg bg-orange-600 px-8 py-3 font-semibold text-white hover:bg-orange-700"
+                                className="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-8 py-3.5 font-semibold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95"
                             >
-                                Browse Menu
+                                <span>Browse Menu</span>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2.5}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+                                    />
+                                </svg>
                             </Link>
 
                             <Link
                                 href="/orders"
-                                className="rounded-lg border bg-white px-8 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+                                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-8 py-3.5 font-semibold text-gray-700 shadow-sm transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-600 hover:shadow-md active:translate-y-0 active:scale-95"
                             >
-                                View My Orders
+                                <span>View My Orders</span>
                             </Link>
 
                         </div>
@@ -82,7 +96,7 @@ export default function HomePage() {
 
                                 <div
                                     key={feature.title}
-                                    className="rounded-2xl border bg-white p-6 text-center shadow-sm transition hover:shadow-md"
+                                    className="rounded-2xl border bg-white p-6 text-center shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
                                 >
 
                                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 text-3xl">

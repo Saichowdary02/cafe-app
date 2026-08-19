@@ -256,7 +256,7 @@ export default function CartPage() {
 
             <ProtectedRoute>
 
-                <div className="min-h-screen bg-gray-50">
+                <div className="min-h-screen">
 
                     <Navbar />
 
@@ -281,7 +281,7 @@ export default function CartPage() {
 
         <ProtectedRoute>
 
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
 
                 <Navbar />
 
@@ -318,239 +318,207 @@ export default function CartPage() {
 
 
                     {/* Empty Cart */}
-
                     {cart.length === 0 ? (
-
-                        <div className="rounded-xl border bg-white p-12 text-center">
-
-                            <div className="text-6xl">
+                        <div className="mx-auto max-w-lg rounded-3xl border border-stone-200/80 bg-white/95 p-12 text-center shadow-xl shadow-amber-900/5 backdrop-blur-md">
+                            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-50 to-orange-100 text-5xl shadow-inner">
                                 🛒
                             </div>
 
-
-                            <h2 className="mt-5 text-2xl font-bold text-gray-900">
+                            <h2 className="mt-6 text-2xl font-bold text-gray-900">
                                 Your cart is empty
                             </h2>
 
-
-                            <p className="mt-2 text-gray-600">
-                                Add some delicious items from our menu.
+                            <p className="mt-2 text-stone-500">
+                                Looks like you haven&apos;t added any delicious chai, coffee, or snacks yet.
                             </p>
-
 
                             <Link
                                 href="/items"
-                                className="mt-6 inline-block rounded-lg bg-orange-600 px-6 py-3 font-medium text-white hover:bg-orange-700"
+                                className="group mt-8 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-8 py-3.5 font-semibold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:scale-95"
                             >
-                                Browse Items
+                                <span>Browse Menu</span>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2.5}
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
                             </Link>
-
                         </div>
-
                     ) : (
-
                         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-
-
                             {/* Cart Items */}
-
                             <div className="space-y-4 lg:col-span-2">
-
                                 {cart.map((item) => (
-
                                     <div
                                         key={item.id}
-                                        className="flex items-center gap-5 rounded-xl border bg-white p-5 shadow-sm"
+                                        className="group relative flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-white/95 p-5 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md sm:flex-row sm:items-center sm:gap-6"
                                     >
-
-
                                         {/* Image */}
-
-                                        {item.image ? (
-
-                                            <img
-                                                src={item.image}
-                                                alt={item.name}
-                                                className="h-24 w-24 rounded-lg object-cover"
-                                            />
-
-                                        ) : (
-
-                                            <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-gray-100 text-4xl">
-                                                ☕
-                                            </div>
-
-                                        )}
-
+                                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-stone-200/60 bg-stone-100/70 shadow-2xs">
+                                            {item.image ? (
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100/60 text-3xl">
+                                                    ☕
+                                                </div>
+                                            )}
+                                        </div>
 
                                         {/* Product Details */}
-
-                                        <div className="flex-1">
-
-                                            <p className="text-sm text-orange-600">
+                                        <div className="min-w-0 flex-1">
+                                            <span className="inline-block rounded-md bg-orange-50 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-orange-700 border border-orange-100">
                                                 {item.category}
-                                            </p>
+                                            </span>
 
-
-                                            <h2 className="text-lg font-bold text-gray-900">
+                                            <h2 className="mt-1 truncate text-base font-bold text-gray-900 transition-colors group-hover:text-orange-600">
                                                 {item.name}
                                             </h2>
 
-
-                                            <p className="mt-1 font-semibold text-gray-900">
-                                                ₹{Number(item.price).toFixed(2)}
+                                            <p className="mt-0.5 text-xs font-medium text-stone-500">
+                                                ₹{Number(item.price).toFixed(2)} each
                                             </p>
-
                                         </div>
 
+                                        {/* Stepper, Subtotal & Delete */}
+                                        <div className="flex items-center justify-between gap-4 sm:justify-end">
+                                            {/* Quantity Stepper */}
+                                            <div className="flex items-center rounded-xl border border-stone-200/80 bg-stone-50/80 p-1 shadow-2xs">
+                                                <button
+                                                    onClick={() => decreaseQuantity(item.id)}
+                                                    disabled={placingOrder}
+                                                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white font-bold text-stone-700 shadow-2xs transition-all hover:bg-orange-50 hover:text-orange-600 active:scale-90 disabled:opacity-50"
+                                                    title="Decrease quantity"
+                                                >
+                                                    −
+                                                </button>
 
-                                        {/* Quantity */}
+                                                <span className="w-8 text-center text-sm font-extrabold text-stone-900">
+                                                    {item.quantity}
+                                                </span>
 
-                                        <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => increaseQuantity(item.id)}
+                                                    disabled={placingOrder}
+                                                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white font-bold text-stone-700 shadow-2xs transition-all hover:bg-orange-50 hover:text-orange-600 active:scale-90 disabled:opacity-50"
+                                                    title="Increase quantity"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
 
+                                            {/* Subtotal */}
+                                            <div className="w-20 text-right">
+                                                <p className="text-base font-extrabold text-gray-900">
+                                                    ₹{(Number(item.price) * item.quantity).toFixed(2)}
+                                                </p>
+                                            </div>
+
+                                            {/* Remove Button */}
                                             <button
-                                                onClick={() =>
-                                                    decreaseQuantity(item.id)
-                                                }
+                                                onClick={() => removeItem(item.id)}
                                                 disabled={placingOrder}
-                                                className="flex h-9 w-9 items-center justify-center rounded-md border text-lg font-bold hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="group/del flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 active:scale-90 disabled:opacity-50"
+                                                title="Remove item"
                                             >
-                                                −
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="h-4 w-4 transition-transform group-hover/del:scale-110"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                    />
+                                                </svg>
                                             </button>
-
-
-                                            <span className="w-6 text-center font-semibold">
-                                                {item.quantity}
-                                            </span>
-
-
-                                            <button
-                                                onClick={() =>
-                                                    increaseQuantity(item.id)
-                                                }
-                                                disabled={placingOrder}
-                                                className="flex h-9 w-9 items-center justify-center rounded-md border text-lg font-bold hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                +
-                                            </button>
-
                                         </div>
-
-
-                                        {/* Subtotal */}
-
-                                        <div className="w-24 text-right">
-
-                                            <p className="font-bold text-gray-900">
-
-                                                ₹
-                                                {(
-                                                    Number(item.price) *
-                                                    item.quantity
-                                                ).toFixed(2)}
-
-                                            </p>
-
-                                        </div>
-
-
-                                        {/* Remove */}
-
-                                        <button
-                                            onClick={() =>
-                                                removeItem(item.id)
-                                            }
-                                            disabled={placingOrder}
-                                            className="text-sm font-medium text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            Remove
-                                        </button>
-
                                     </div>
-
                                 ))}
-
                             </div>
 
-
                             {/* Order Summary */}
-
-                            <div className="h-fit rounded-xl border bg-white p-6 shadow-sm">
-
-                                <h2 className="text-xl font-bold text-gray-900">
+                            <div className="sticky top-24 h-fit rounded-3xl border border-stone-200/80 bg-white/95 p-7 shadow-xl shadow-amber-900/5 backdrop-blur-md">
+                                <h2 className="text-xl font-extrabold text-gray-900">
                                     Order Summary
                                 </h2>
 
+                                <div className="mt-6 space-y-3 border-b border-stone-100 pb-5 text-sm">
+                                    <div className="flex justify-between text-stone-600">
+                                        <span>Total Items</span>
+                                        <span className="font-semibold text-stone-900">{totalItems}</span>
+                                    </div>
 
-                                {/* Items */}
-
-                                <div className="mt-6 flex justify-between text-gray-600">
-
-                                    <span>
-                                        Items
-                                    </span>
-
-                                    <span>
-                                        {totalItems}
-                                    </span>
-
+                                    <div className="flex justify-between text-stone-600">
+                                        <span>Packaging & Delivery</span>
+                                        <span className="font-semibold text-emerald-600">FREE</span>
+                                    </div>
                                 </div>
-
 
                                 {/* Total */}
-
-                                <div className="mt-4 flex justify-between text-lg font-bold text-gray-900">
-
-                                    <span>
-                                        Total
-                                    </span>
-
-                                    <span>
+                                <div className="mt-5 flex items-baseline justify-between">
+                                    <span className="text-base font-bold text-stone-700">Total Amount</span>
+                                    <span className="text-2xl font-black text-gray-900">
                                         ₹{total.toFixed(2)}
                                     </span>
-
                                 </div>
 
-
-                                {/* Error */}
-
+                                {/* Error message if any */}
                                 {error && (
-
-                                    <p className="mt-4 text-sm text-red-600">
+                                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-xs font-semibold text-red-600">
                                         {error}
-                                    </p>
-
+                                    </div>
                                 )}
 
-
-                                {/* Place Order */}
-
+                                {/* Place Order Button */}
                                 <button
                                     onClick={handlePlaceOrder}
                                     disabled={placingOrder || cart.length === 0}
-                                    className="mt-6 w-full rounded-lg bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-
-                                    {placingOrder
-                                        ? "Placing Order..."
-                                        : "Place Order"}
-
+                                    {placingOrder ? (
+                                        <>
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                            <span>Placing Order...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>Place Order</span>
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2.5}
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                            </svg>
+                                        </>
+                                    )}
                                 </button>
 
-
-                                {/* Continue Shopping */}
-
+                                {/* Continue Shopping Link */}
                                 <Link
                                     href="/items"
-                                    className="mt-3 block text-center text-sm text-gray-600 hover:text-orange-600"
+                                    className="mt-4 flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-stone-600 transition-colors hover:text-orange-600"
                                 >
-                                    Continue Shopping
+                                    <span>← Continue Shopping</span>
                                 </Link>
-
                             </div>
-
                         </div>
-
                     )}
 
                 </main>
