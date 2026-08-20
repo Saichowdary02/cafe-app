@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Toast from "@/components/Toast";
 
 export default function LoginPage() {
 
@@ -11,17 +12,20 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
-    const [message, setMessage] = useState("");
+    const [toast, setToast] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const showToast = (message, type = "success") => {
+        setToast({ message, type });
+        setTimeout(() => {
+            setToast(null);
+        }, 3500);
+    };
 
     const handleLogin = async (e) => {
 
         e.preventDefault();
-
-        setMessage("");
         setLoading(true);
-
 
         try {
 
@@ -29,11 +33,9 @@ export default function LoginPage() {
                 "http://localhost:5000/api/auth/login",
                 {
                     method: "POST",
-
                     headers: {
                         "Content-Type": "application/json"
                     },
-
                     body: JSON.stringify({
                         email,
                         password
@@ -41,75 +43,53 @@ export default function LoginPage() {
                 }
             );
 
-
             const data = await response.json();
 
-
             if (!response.ok) {
-
-                setMessage(
-                    data.message || "Invalid email or password"
-                );
-
+                showToast(data.message || "Invalid email or password", "error");
                 setLoading(false);
-
                 return;
             }
-
 
             /*
              * Store JWT
              */
-
-            localStorage.setItem(
-                "token",
-                data.token
-            );
-
+            localStorage.setItem("token", data.token);
 
             /*
              * Store user information
              */
+            localStorage.setItem("user", JSON.stringify(data.user));
 
-            localStorage.setItem(
-                "user",
-                JSON.stringify(data.user)
-            );
-
-
-            setMessage("Login successful!");
-
+            showToast("Login successful!", "success");
 
             /*
-             * Go to Home
+             * Go to Home after short delay to view toast
              */
-
             setTimeout(() => {
-
                 router.push("/home");
-
-            }, 500);
-
+            }, 1000);
 
         } catch (error) {
-
             console.error(error);
-
-            setMessage(
-                "Unable to connect to server."
-            );
-
+            showToast("Unable to connect to server.", "error");
         } finally {
-
             setLoading(false);
-
         }
     };
-
 
     return (
 
         <main className="relative flex min-h-screen items-center justify-center px-4">
+
+            {/* Toast Notification */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
 
             {/* Top-left Brand Logo & Name */}
             <div className="absolute top-6 left-6">
@@ -154,23 +134,19 @@ export default function LoginPage() {
                     Login to your Cafe App account
                 </p>
 
-
                 <form
                     onSubmit={handleLogin}
                     className="space-y-5"
                 >
 
                     {/* Email */}
-
                     <div>
-
                         <label
                             htmlFor="email"
-                            className="mb-2 block font-medium"
+                            className="mb-2 block font-medium text-stone-700"
                         >
                             Email
                         </label>
-
                         <input
                             id="email"
                             type="email"
@@ -180,23 +156,18 @@ export default function LoginPage() {
                             }
                             placeholder="Enter your email"
                             required
-                            className="w-full rounded-md border px-3 py-2 outline-none focus:border-orange-500"
+                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         />
-
                     </div>
 
-
                     {/* Password */}
-
                     <div>
-
                         <label
                             htmlFor="password"
-                            className="mb-2 block font-medium"
+                            className="mb-2 block font-medium text-stone-700"
                         >
                             Password
                         </label>
-
                         <input
                             id="password"
                             type="password"
@@ -206,29 +177,15 @@ export default function LoginPage() {
                             }
                             placeholder="Enter your password"
                             required
-                            className="w-full rounded-md border px-3 py-2 outline-none focus:border-orange-500"
+                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         />
-
                     </div>
 
-
-                    {/* Message */}
-
-                    {message && (
-
-                        <p className="text-center text-sm">
-                            {message}
-                        </p>
-
-                    )}
-
-
                     {/* Login button */}
-
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full rounded-md bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                        className="w-full cursor-pointer rounded-xl bg-orange-600 py-3 font-semibold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.99] disabled:opacity-50"
                     >
                         {loading
                             ? "Logging in..."
@@ -238,18 +195,14 @@ export default function LoginPage() {
 
                 </form>
 
-
                 <p className="mt-6 text-center text-sm text-gray-600">
-
                     Don't have an account?
-
                     <button
                         onClick={() => router.push("/register")}
-                        className="ml-1 font-semibold text-orange-600 hover:text-orange-700"
+                        className="ml-1 cursor-pointer font-semibold text-orange-600 hover:text-orange-700"
                     >
                         Create account
                     </button>
-
                 </p>
 
             </div>

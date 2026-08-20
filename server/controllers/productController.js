@@ -178,6 +178,7 @@ const updateProduct = async (req, res) => {
     }
 };
 const deleteProduct = async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
 
@@ -193,11 +194,22 @@ const deleteProduct = async (req, res) => {
             });
         }
 
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Remove referenced order items first (handles case where foreign key lacks CASCADE in DB)
+        await connection.execute(
+            "DELETE FROM order_items WHERE product_id = ?",
+            [id]
+        );
+
         // Delete product
-        await pool.execute(
+        await connection.execute(
             "DELETE FROM products WHERE id = ?",
             [id]
         );
+
+        await connection.commit();
 
         return res.status(200).json({
             message: "Product deleted successfully",
@@ -208,11 +220,18 @@ const deleteProduct = async (req, res) => {
         });
 
     } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
         console.error("Delete product error:", error);
 
         return res.status(500).json({
-            message: "Failed to delete product"
+            message: error.message || "Failed to delete product"
         });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 };
 module.exports = {

@@ -26,3 +26,14 @@ body {
   min-height: 100vh;
 }
 
+@media print {
+  @page {
+    size: auto;
+    margin: 6mm;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+}
+

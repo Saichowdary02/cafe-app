@@ -161,11 +161,11 @@ const getMyOrders = async (req, res) => {
                 `SELECT
                     oi.id,
                     oi.product_id,
-                    p.name,
+                    COALESCE(p.name, 'Item') AS name,
                     oi.quantity,
                     oi.price
                  FROM order_items oi
-                 JOIN products p
+                 LEFT JOIN products p
                     ON oi.product_id = p.id
                  WHERE oi.order_id = ?`,
                 [order.id]
@@ -216,11 +216,11 @@ const getAllOrders = async (req, res) => {
                 `SELECT
                     oi.id,
                     oi.product_id,
-                    p.name AS product_name,
+                    COALESCE(p.name, 'Item') AS product_name,
                     oi.quantity,
                     oi.price
                  FROM order_items oi
-                 INNER JOIN products p
+                 LEFT JOIN products p
                     ON oi.product_id = p.id
                  WHERE oi.order_id = ?`,
                 [order.id]

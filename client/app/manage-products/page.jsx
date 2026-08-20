@@ -635,7 +635,7 @@ export default function ManageProductsPage() {
                             <button
                                 type="submit"
                                 disabled={deleting}
-                                className="rounded-lg border border-red-200 px-5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                className="cursor-pointer rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:shadow-red-600/20 active:scale-95 disabled:opacity-50"
                             >
                                 {deleting ? "Deleting..." : "Delete Product"}
                             </button>

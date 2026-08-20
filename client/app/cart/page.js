@@ -5,6 +5,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import chaiImg from "@/app/images/chai.png";
+import coffeeImg from "@/app/images/coffee.png";
+import snackImg from "@/app/images/snack.png";
+
+function getCartItemImage(item) {
+    if (item?.image) return item.image;
+    const cat = item?.category?.toLowerCase() || "";
+    const name = item?.name?.toLowerCase() || "";
+
+    if (cat === "chai" || cat === "tea" || name.includes("chai") || name.includes("tea")) {
+        return chaiImg.src;
+    }
+    if (cat === "coffee" || name.includes("coffee") || name.includes("latte") || name.includes("cappuccino") || name.includes("espresso")) {
+        return coffeeImg.src;
+    }
+    if (cat === "snacks" || cat === "snack" || cat === "food") {
+        return snackImg.src;
+    }
+    return null;
+}
 
 export default function CartPage() {
 
@@ -18,27 +38,18 @@ export default function CartPage() {
 
     // Load cart from localStorage
     useEffect(() => {
-
         const savedCart = localStorage.getItem("cart");
 
         if (savedCart) {
-
             try {
-
                 setCart(JSON.parse(savedCart));
-
             } catch (error) {
-
                 console.error("Failed to load cart:", error);
-
                 localStorage.removeItem("cart");
-
             }
-
         }
 
         setLoading(false);
-
     }, []);
 
 
@@ -360,15 +371,15 @@ export default function CartPage() {
                                     >
                                         {/* Image */}
                                         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-stone-200/60 bg-stone-100/70 shadow-2xs">
-                                            {item.image ? (
+                                            {getCartItemImage(item) ? (
                                                 <img
-                                                    src={item.image}
+                                                    src={getCartItemImage(item)}
                                                     alt={item.name}
                                                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 />
                                             ) : (
                                                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100/60 text-3xl">
-                                                    ☕
+                                                    {item.category === "Coffee" ? "☕" : item.category === "Chai" ? "🍵" : "🥐"}
                                                 </div>
                                             )}
                                         </div>
