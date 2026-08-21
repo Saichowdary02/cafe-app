@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import chaiImg from "@/app/images/chai.png";
 import coffeeImg from "@/app/images/coffee.png";
 import snackImg from "@/app/images/snack.png";
+import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
 
 function getCartItemImage(item) {
     if (item?.image) return item.image;
@@ -31,12 +32,13 @@ export default function CartPage() {
     const router = useRouter();
 
     const [cart, setCart] = useState([]);
+    const [billSettings, setBillSettings] = useState(DEFAULT_BILL_SETTINGS);
     const [loading, setLoading] = useState(true);
     const [placingOrder, setPlacingOrder] = useState(false);
     const [error, setError] = useState("");
 
 
-    // Load cart from localStorage
+    // Load cart from localStorage & fetch bill settings
     useEffect(() => {
         const savedCart = localStorage.getItem("cart");
 
@@ -49,7 +51,24 @@ export default function CartPage() {
             }
         }
 
-        setLoading(false);
+        const fetchSettings = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+                const res = await fetch(`${apiUrl}/api/bill/settings`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.settings) {
+                        setBillSettings(data.settings);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch bill settings:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSettings();
     }, []);
 
 
@@ -114,18 +133,17 @@ export default function CartPage() {
     };
 
 
-    // Calculate total
-    const total = cart.reduce(
-        (sum, item) =>
-            sum + Number(item.price) * item.quantity,
+    // Calculate subtotal & bill breakdown
+    const subtotal = cart.reduce(
+        (sum, item) => sum + Number(item.price) * item.quantity,
         0
     );
 
+    const bill = calculateBillBreakdown(subtotal, billSettings);
 
     // Calculate total quantity
     const totalItems = cart.reduce(
-        (sum, item) =>
-            sum + item.quantity,
+        (sum, item) => sum + item.quantity,
         0
     );
 
@@ -460,30 +478,91 @@ export default function CartPage() {
                                 ))}
                             </div>
 
-                            {/* Order Summary */}
-                            <div className="sticky top-24 h-fit rounded-3xl border border-stone-200/80 bg-white/95 p-7 shadow-xl shadow-amber-900/5 backdrop-blur-md">
-                                <h2 className="text-xl font-extrabold text-gray-900">
-                                    Order Summary
-                                </h2>
-
-                                <div className="mt-6 space-y-3 border-b border-stone-100 pb-5 text-sm">
-                                    <div className="flex justify-between text-stone-600">
-                                        <span>Total Items</span>
-                                        <span className="font-semibold text-stone-900">{totalItems}</span>
-                                    </div>
-
-                                    <div className="flex justify-between text-stone-600">
-                                        <span>Packaging & Delivery</span>
-                                        <span className="font-semibold text-emerald-600">FREE</span>
-                                    </div>
+                            {/* Order Summary & Detailed Bill Breakdown */}
+                            <div className="sticky top-24 h-fit rounded-3xl border border-stone-200/80 bg-white/95 p-6 shadow-xl shadow-amber-900/5 backdrop-blur-md sm:p-7">
+                                <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                                    <h2 className="text-xl font-extrabold text-gray-900">
+                                        Bill Details
+                                    </h2>
+                                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700 border border-orange-200/70">
+                                        {totalItems} {totalItems === 1 ? "Item" : "Items"}
+                                    </span>
                                 </div>
 
-                                {/* Total */}
-                                <div className="mt-5 flex items-baseline justify-between">
-                                    <span className="text-base font-bold text-stone-700">Total Amount</span>
-                                    <span className="text-2xl font-black text-gray-900">
-                                        ₹{total.toFixed(2)}
-                                    </span>
+                                <div className="mt-4 space-y-2.5 text-xs sm:text-sm">
+                                    {/* Subtotal */}
+                                    <div className="flex items-center justify-between text-stone-700">
+                                        <div>
+                                            <span className="font-medium">Subtotal</span>
+                                            <span className="ml-1 text-[11px] text-stone-400">(Food & Snacks)</span>
+                                        </div>
+                                        <span className="font-semibold text-stone-900">₹{bill.subtotal.toFixed(2)}</span>
+                                    </div>
+
+                                    {/* Packaging Fee */}
+                                    <div className="flex items-center justify-between text-stone-700">
+                                        <div>
+                                            <span className="font-medium">Packaging Fee</span>
+                                            <span className="ml-1 rounded-md bg-stone-100 px-1.5 py-0.2 text-[10px] font-semibold text-stone-600">
+                                                {bill.packaging_fee_percent}%
+                                            </span>
+                                        </div>
+                                        <span className="font-semibold text-stone-900">₹{bill.packaging_fee.toFixed(2)}</span>
+                                    </div>
+
+                                    {/* Platform Fee */}
+                                    <div className="flex items-center justify-between text-stone-700">
+                                        <div>
+                                            <span className="font-medium">Platform Fee</span>
+                                            <span className="ml-1 text-[11px] text-stone-400">(App fee)</span>
+                                        </div>
+                                        <span className="font-semibold text-stone-900">₹{bill.platform_fee.toFixed(2)}</span>
+                                    </div>
+
+                                    {/* Taxes Section */}
+                                    <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-3 space-y-2 text-xs">
+                                        <div className="flex items-center justify-between text-stone-600">
+                                            <span>CGST ({bill.cgst_percent}%)</span>
+                                            <span className="font-medium text-stone-800">₹{bill.cgst.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-stone-600">
+                                            <span>SGST ({bill.sgst_percent}%)</span>
+                                            <span className="font-medium text-stone-800">₹{bill.sgst.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-stone-600">
+                                            <span>GST on Platform Fee ({bill.platform_fee_gst_percent}%)</span>
+                                            <span className="font-medium text-stone-800">₹{bill.platform_fee_gst.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Calculated Total */}
+                                    <div className="flex items-center justify-between pt-2 text-stone-600">
+                                        <span className="text-xs">Calculated Total</span>
+                                        <span className="font-semibold text-stone-700">₹{bill.calculated_total.toFixed(2)}</span>
+                                    </div>
+
+                                    {/* Rounding Off */}
+                                    {bill.rounding_off !== 0 && (
+                                        <div className="flex items-center justify-between text-stone-500 text-xs">
+                                            <span>Rounding Off (Ceil)</span>
+                                            <span className="font-medium text-stone-700">
+                                                {bill.rounding_off > 0 ? `+₹${bill.rounding_off.toFixed(2)}` : `-₹${Math.abs(bill.rounding_off).toFixed(2)}`}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Grand Total */}
+                                <div className="mt-4 border-t border-stone-200/90 pt-4">
+                                    <div className="flex items-baseline justify-between">
+                                        <div>
+                                            <span className="text-base font-extrabold text-stone-900">Grand Total</span>
+                                            <span className="block text-[11px] font-medium text-stone-500">Payable Amount</span>
+                                        </div>
+                                        <span className="text-2xl font-black text-orange-600">
+                                            ₹{bill.grand_total.toFixed(2)}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* Error message if any */}

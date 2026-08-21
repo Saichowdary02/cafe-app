@@ -1,6 +1,6 @@
 # ☕ Cafe App — Full-Stack Coffee & Tea Ordering System
 
-A modern, responsive, full-stack web application designed for cafes and coffee shops. **Cafe App** allows customers to explore categorized beverage and snack menus, manage a shopping cart, place transactional orders, and track order statuses in real time. It also features a dedicated portal for **Staff** to process incoming orders and an **Admin** suite for complete product inventory management.
+A modern, responsive, full-stack web application designed for cafes and coffee shops. **Cafe App** allows customers to explore categorized beverage and snack menus, manage a shopping cart with live bill breakdown, place transactional orders, and track order statuses in real time. It features a dedicated **Staff** portal for processing incoming orders with thermal receipt printing, and an **Admin** suite for complete product inventory management and dynamic billing configuration.
 
 ---
 
@@ -10,6 +10,7 @@ A modern, responsive, full-stack web application designed for cafes and coffee s
 - [System Architecture](#-system-architecture)
 - [Tech Stack](#-tech-stack)
 - [Key Features & Role-Based Access (RBAC)](#-key-features--role-based-access-rbac)
+- [Billing & Tax Calculation Engine](#-billing--tax-calculation-engine)
 - [Database Design & Schema](#-database-design--schema)
 - [API Documentation](#-api-documentation)
 - [Project Directory Structure](#-project-directory-structure)
@@ -27,9 +28,9 @@ A modern, responsive, full-stack web application designed for cafes and coffee s
 ## 🌟 Overview
 
 Cafe App streamlines the digital ordering workflow for beverage outlets:
-- **Customers** register, browse freshly curated menus (Chai, Coffee, Snacks), customize cart quantities, and place orders.
-- **Baristas / Staff** receive customer orders with live status badges and advance orders through preparation stages.
-- **Store Managers / Admins** enjoy full inventory controls (Create, Read, Update, Delete menu items) and can inspect entire order histories.
+- **Customers** register, browse freshly curated menus (Chai, Coffee, Snacks), customize cart quantities, view a live itemized bill breakdown (including GST, packaging fees, and platform charges), and place orders.
+- **Baristas / Staff** receive customer orders with live status badges, advance orders through preparation stages, view detailed receipts with full tax breakdowns, and print thermal bills.
+- **Store Managers / Admins** enjoy full inventory controls (Create, Read, Update, Delete menu items), can inspect entire order histories, configure billing parameters (tax rates, packaging fees, platform charges) via a dedicated settings page, and generate printed receipts.
 
 ---
 
@@ -43,6 +44,7 @@ graph TD
         UI[App Router Pages]
         AuthGuard[ProtectedRoute & Role Guard]
         State[LocalStorage / Client State]
+        BillCalc["Bill Calculator (lib/billCalculator.js)"]
     end
 
     subgraph API ["Backend (Node.js + Express 5)"]
@@ -50,11 +52,12 @@ graph TD
         AuthMW[JWT Auth Middleware]
         RoleMW[Role-Based Access Middleware]
         Controllers[Business Logic Controllers]
+        BillCtrl["Bill Controller (calculateBillBreakdown)"]
         DBPool[MySQL2 Promise Connection Pool]
     end
 
     subgraph Storage ["Database (MySQL)"]
-        Tables[(Users, Products, Orders, Order_Items)]
+        Tables["Users, Products, Orders, Order_Items, Bill_Settings"]
     end
 
     UI -->|HTTP / JSON Requests with Bearer Token| Router
@@ -62,13 +65,18 @@ graph TD
     AuthMW --> RoleMW
     RoleMW --> Controllers
     Controllers -->|Transactions & Parameterized Queries| DBPool
+    BillCtrl -->|Read/Write bill_settings| DBPool
     DBPool --> Tables
+    UI --> BillCalc
+    BillCalc -->|Fetch settings via API| Router
 ```
 
 ### Architectural Highlights
 1. **Separation of Concerns**: Controllers isolate business logic from routing, while middleware handles authentication and authorization.
 2. **ACID Transaction Integrity**: Order placement executes within a MySQL transaction (`connection.beginTransaction()`) to ensure atomicity across orders and order items; automatic rollback triggers if any item validation or insertion fails.
 3. **Stateless Authentication**: Authenticated sessions rely on secure JSON Web Tokens (JWT) signed with expiration times.
+4. **Dual Bill Calculation**: Bill breakdown logic is mirrored in both the frontend (`lib/billCalculator.js`) and backend (`controllers/billController.js`) to ensure consistent totals across cart, receipts, and order records.
+5. **Dynamic Configuration**: Billing parameters (tax rates, fees) are stored in the database and fetched at runtime, allowing admins to update them without code changes.
 
 ---
 
@@ -108,25 +116,135 @@ The system supports three user roles: `USER`, `STAFF`, and `ADMIN`.
 | Account Registration & Login | ✅ | ✅ | ✅ |
 | Browse Categorized Menu | ✅ | ✅ | ✅ |
 | Manage Shopping Cart | ✅ | ✅ | ✅ |
+| View Live Bill Breakdown in Cart | ✅ | ✅ | ✅ |
 | Place Orders (Transactional) | ✅ | ✅ | ✅ |
 | View Personal Order History | ✅ | ✅ | ✅ |
 | View All Customer Orders | ❌ | ✅ | ✅ |
+| View Order Dashboard Stats (Pending/Preparing/Completed) | ❌ | ✅ | ✅ |
 | Update Order Status (`PREPARING` / `COMPLETED`) | ❌ | ✅ | ✅ |
+| View Receipt with Full Tax Breakdown | ❌ | ✅ | ✅ |
+| Print Thermal Bill / Receipt | ❌ | ✅ | ✅ |
 | Create New Products | ❌ | ❌ | ✅ |
 | Edit Product Price, Category & Image | ❌ | ❌ | ✅ |
 | Delete Menu Items | ❌ | ❌ | ✅ |
+| Configure Bill Settings (Tax Rates, Fees) | ❌ | ❌ | ✅ |
+
+### Page Access Summary
+
+| Page Route | Description | Accessible By |
+| :--- | :--- | :--- |
+| `/home` | Hero landing & feature showcase | All (public) |
+| `/login` | User authentication | All (public) |
+| `/register` | User registration | All (public) |
+| `/items` | Categorized menu with 'Add to Cart' | All (authenticated) |
+| `/cart` | Shopping cart with live bill breakdown & checkout | All (authenticated) |
+| `/orders` | Order history & status tracking | All (authenticated, role-filtered views) |
+| `/order-success` | Post-checkout confirmation screen | All (authenticated) |
+| `/manage-products` | Admin CRUD suite (Add, Edit, Delete, Search) | Admin only |
+| `/manage-billing` | Admin bill settings configuration | Admin only |
+
+---
+
+## 💰 Billing & Tax Calculation Engine
+
+The billing system calculates a detailed breakdown of charges for every order. All percentages and fees are **dynamically configurable** by the Admin via the `/manage-billing` page.
+
+### Bill Breakdown Formula
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     BILL CALCULATION                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Subtotal (Food & Snacks)                                       │
+│  = Sum of (item_price × quantity) for all items                 │
+│                                                                 │
+│  Packaging Fee                                                  │
+│  = Subtotal × (packaging_fee_percent / 100)                     │
+│  Default: 5% of Subtotal                                        │
+│                                                                 │
+│  Platform Fee (App Fee)                                         │
+│  = Fixed amount (default: ₹5.00)                                │
+│                                                                 │
+│  CGST                                                           │
+│  = (Subtotal + Packaging Fee) × (cgst_percent / 100)            │
+│  Default: 2.5%                                                  │
+│                                                                 │
+│  SGST                                                           │
+│  = (Subtotal + Packaging Fee) × (sgst_percent / 100)            │
+│  Default: 2.5%                                                  │
+│                                                                 │
+│  GST on Platform Fee                                            │
+│  = Platform Fee × (platform_fee_gst_percent / 100)              │
+│  Default: 18%                                                   │
+│                                                                 │
+│  Calculated Total                                               │
+│  = Subtotal + Packaging Fee + Platform Fee                      │
+│    + CGST + SGST + GST on Platform Fee                          │
+│                                                                 │
+│  Rounding Off Adjustment                                        │
+│  = Math.ceil(Calculated Total) - Calculated Total               │
+│                                                                 │
+│  Grand Total (Payable)                                          │
+│  = Math.ceil(Calculated Total)                                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Default Bill Settings
+
+| Parameter | Default Value | Description |
+| :--- | :--- | :--- |
+| `packaging_fee_percent` | `5.0%` | Percentage of subtotal charged as packaging fee |
+| `platform_fee` | `₹5.00` | Fixed platform/app usage fee per order |
+| `cgst_percent` | `2.5%` | Central GST applied on (Subtotal + Packaging Fee) |
+| `sgst_percent` | `2.5%` | State GST applied on (Subtotal + Packaging Fee) |
+| `platform_fee_gst_percent` | `18.0%` | GST applied on the Platform Fee |
+
+### Rounding Rules
+- Each individual line item (CGST, SGST, Packaging Fee, etc.) is rounded to **2 decimal places** before summing.
+- The `Calculated Total` is the sum of all rounded line items.
+- The `Grand Total` is the `Calculated Total` rounded **up** to the next integer (using `Math.ceil()`).
+- The `Rounding Off Adjustment` shows the difference between Grand Total and Calculated Total.
+
+### Calculation Consistency
+The calculation logic is **mirrored** in two locations to ensure the frontend cart view and the backend order processing always produce identical totals:
+
+| Location | File | Purpose |
+| :--- | :--- | :--- |
+| **Frontend** | `client/lib/billCalculator.js` | Real-time cart breakdown & receipt modal display |
+| **Backend** | `server/controllers/billController.js` | Server-side order validation & receipt generation |
+
+Both implementations fetch live settings from the `bill_settings` database table at runtime.
+
+### Example Calculation
+
+For an order with Subtotal = ₹165.00 and default settings:
+
+| Component | Calculation | Amount |
+| :--- | :--- | :--- |
+| Subtotal | — | ₹165.00 |
+| Packaging Fee (5%) | 165.00 × 0.05 | ₹8.25 |
+| Platform Fee | Fixed | ₹5.00 |
+| CGST (2.5%) | (165.00 + 8.25) × 0.025 | ₹4.33 |
+| SGST (2.5%) | (165.00 + 8.25) × 0.025 | ₹4.33 |
+| GST on Platform Fee (18%) | 5.00 × 0.18 | ₹0.90 |
+| **Calculated Total** | Sum of all above | **₹187.81** |
+| Rounding Off | ceil(187.81) - 187.81 | +₹0.19 |
+| **Grand Total** | ceil(187.81) | **₹188.00** |
 
 ---
 
 ## 🗄 Database Design & Schema
 
-The relational database consists of four core tables:
+The relational database consists of **five** core tables:
 
 ```mermaid
 erDiagram
     USERS ||--o{ ORDERS : places
     ORDERS ||--|{ ORDER_ITEMS : contains
     PRODUCTS ||--o{ ORDER_ITEMS : referenced_in
+    BILL_SETTINGS ||--|| BILL_SETTINGS : "singleton config"
 
     USERS {
         int id PK
@@ -160,6 +278,16 @@ erDiagram
         int product_id FK
         int quantity
         decimal price
+    }
+
+    BILL_SETTINGS {
+        int id PK
+        decimal packaging_fee_percent
+        decimal platform_fee
+        decimal cgst_percent
+        decimal sgst_percent
+        decimal platform_fee_gst_percent
+        timestamp updated_at
     }
 ```
 
@@ -209,7 +337,27 @@ CREATE TABLE IF NOT EXISTS order_items (
     CONSTRAINT fk_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     CONSTRAINT fk_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
+
+-- 5. Bill Settings Table (auto-created by the server on first run)
+CREATE TABLE IF NOT EXISTS bill_settings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    packaging_fee_percent DECIMAL(5, 2) NOT NULL DEFAULT 5.00,
+    platform_fee DECIMAL(10, 2) NOT NULL DEFAULT 5.00,
+    cgst_percent DECIMAL(5, 2) NOT NULL DEFAULT 2.50,
+    sgst_percent DECIMAL(5, 2) NOT NULL DEFAULT 2.50,
+    platform_fee_gst_percent DECIMAL(5, 2) NOT NULL DEFAULT 18.00,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert default bill settings (singleton row)
+INSERT INTO bill_settings
+    (id, packaging_fee_percent, platform_fee, cgst_percent, sgst_percent, platform_fee_gst_percent)
+VALUES
+    (1, 5.00, 5.00, 2.50, 2.50, 18.00)
+ON DUPLICATE KEY UPDATE id = id;
 ```
+
+> **Note**: The `bill_settings` table is automatically created and seeded by the server (`billController.js`) on first API access, so manual creation is optional.
 
 ---
 
@@ -321,7 +469,62 @@ Base URL: `http://localhost:5000`
 
 ---
 
-### 4. Diagnostic & Health Endpoints
+### 4. Bill Settings Endpoints (`/api/bill`)
+
+| Method | Endpoint | Access / Role | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/bill/settings` | Public | Retrieve current billing configuration |
+| `PUT` | `/api/bill/settings` | `ADMIN` (Bearer Token) | Update billing parameters |
+
+> **Alias**: The same endpoints are also available under `/api/bill-settings/` and `/api/bill-settings/settings` for convenience.
+
+#### Get Bill Settings (`GET /api/bill/settings`)
+- **Access**: Public (no authentication required)
+- **Response `200 OK`**:
+  ```json
+  {
+    "message": "Bill settings retrieved successfully",
+    "settings": {
+      "packaging_fee_percent": 5,
+      "platform_fee": 5,
+      "cgst_percent": 2.5,
+      "sgst_percent": 2.5,
+      "platform_fee_gst_percent": 18,
+      "updated_at": "2026-08-21T07:30:00.000Z"
+    }
+  }
+  ```
+
+#### Update Bill Settings (`PUT /api/bill/settings`)
+- **Access**: `ADMIN` only (Bearer Token required)
+- **Request Body**:
+  ```json
+  {
+    "packaging_fee_percent": 6.0,
+    "platform_fee": 7.00,
+    "cgst_percent": 3.0,
+    "sgst_percent": 3.0,
+    "platform_fee_gst_percent": 18.0
+  }
+  ```
+- **Validation**: All five fields are required and must be valid non-negative numbers.
+- **Response `200 OK`**:
+  ```json
+  {
+    "message": "Bill settings updated successfully",
+    "settings": {
+      "packaging_fee_percent": 6,
+      "platform_fee": 7,
+      "cgst_percent": 3,
+      "sgst_percent": 3,
+      "platform_fee_gst_percent": 18
+    }
+  }
+  ```
+
+---
+
+### 5. Diagnostic & Health Endpoints
 
 - `GET /` — API health check
 - `GET /api/db-test` — Verifies MySQL connectivity
@@ -335,45 +538,52 @@ Base URL: `http://localhost:5000`
 
 ```text
 cafe-app/
-├── client/                     # Next.js Frontend Application
+├── client/                        # Next.js Frontend Application
 │   ├── app/
-│   │   ├── cart/               # Cart page (quantity update, checkout)
-│   │   ├── home/               # Hero landing & feature showcase
-│   │   ├── items/              # Categorized menu with 'Add to Cart'
-│   │   ├── login/              # User authentication page
-│   │   ├── register/           # User registration page
-│   │   ├── manage-products/    # Admin CRUD suite (Add, Edit, Delete, Search)
-│   │   ├── orders/             # Order tracker (Customer / Staff views)
-│   │   ├── order-success/      # Post-checkout confirmation screen
-│   │   ├── globals.css         # Global styles & Tailwind configuration
-│   │   ├── layout.js           # Root layout with fonts & metadata
-│   │   └── page.js             # Root redirect to /home
+│   │   ├── cart/                  # Cart page (quantity update, bill breakdown, checkout)
+│   │   ├── home/                  # Hero landing & feature showcase
+│   │   ├── images/                # Static image assets
+│   │   ├── items/                 # Categorized menu with 'Add to Cart'
+│   │   ├── login/                 # User authentication page
+│   │   ├── register/              # User registration page
+│   │   ├── manage-billing/        # Admin bill settings configuration page
+│   │   ├── manage-products/       # Admin CRUD suite (Add, Edit, Delete, Search)
+│   │   ├── orders/                # Order tracker (Customer / Staff / Admin views)
+│   │   ├── order-success/         # Post-checkout confirmation screen
+│   │   ├── globals.css            # Global styles & Tailwind configuration
+│   │   ├── layout.js              # Root layout with fonts & metadata
+│   │   └── page.js                # Root redirect to /home
 │   ├── components/
-│   │   ├── Navbar.js           # Navigation bar with dynamic role links
-│   │   └── ProtectedRoute.js   # Client-side Auth & Role route guard
+│   │   ├── Navbar.js              # Navigation bar with dynamic role-based links
+│   │   ├── ProtectedRoute.js      # Client-side Auth & Role route guard
+│   │   └── Toast.js               # Notification toast component
+│   ├── lib/
+│   │   └── billCalculator.js      # Frontend bill breakdown calculator
 │   ├── package.json
 │   └── next.config.mjs
 │
-├── server/                     # Express.js Backend Application
+├── server/                        # Express.js Backend Application
 │   ├── config/
-│   │   └── db.js               # MySQL2 connection pool configuration
+│   │   └── db.js                  # MySQL2 connection pool configuration
 │   ├── controllers/
-│   │   ├── authController.js   # Registration & Login business logic
-│   │   ├── productController.js# Product CRUD handlers
-│   │   └── orderController.js  # Transactional order placement & status updates
+│   │   ├── authController.js      # Registration & Login business logic
+│   │   ├── billController.js      # Bill settings CRUD & calculation engine
+│   │   ├── orderController.js     # Transactional order placement & status updates
+│   │   └── productController.js   # Product CRUD handlers
 │   ├── middleware/
-│   │   ├── authMiddleware.js   # JWT verification middleware
-│   │   └── roleMiddleware.js   # RBAC permission checks
+│   │   ├── authMiddleware.js      # JWT verification middleware
+│   │   └── roleMiddleware.js      # RBAC permission checks
 │   ├── routes/
-│   │   ├── authRoutes.js       # Auth endpoint routes
-│   │   ├── productRoutes.js    # Product routes
-│   │   ├── orderRoutes.js      # Order routes
-│   │   └── testRoutes.js       # Diagnostic routes
-│   ├── .env                    # Environment variables (secret)
+│   │   ├── authRoutes.js          # Auth endpoint routes
+│   │   ├── billRoutes.js          # Bill settings routes
+│   │   ├── orderRoutes.js         # Order routes
+│   │   ├── productRoutes.js       # Product routes
+│   │   └── testRoutes.js          # Diagnostic routes
+│   ├── .env                       # Environment variables (secret)
 │   ├── package.json
-│   └── server.js               # Express application entry point
+│   └── server.js                  # Express application entry point
 │
-└── README.md                   # Complete Project Documentation
+└── README.md                      # Complete Project Documentation
 ```
 
 ---
@@ -473,6 +683,8 @@ Make sure the following are installed on your machine:
 - **Server-Side Price Validation**: When an order is placed, item prices are fetched directly from the database to prevent client-side price tampering.
 - **ACID Transactions**: Order headers and line items are committed as a single unit of work with full rollback protection.
 - **Client Route Guards**: `ProtectedRoute` component ensures unauthenticated visitors are redirected to `/login` and non-admin users cannot access administrative views.
+- **Role-Based Navigation**: The `Navbar` dynamically shows/hides links (Manage Products, Bill Settings) based on the logged-in user's role.
+- **Input Validation**: Bill settings API validates that all values are non-negative numbers before persisting to the database.
 
 ---
 
@@ -489,6 +701,57 @@ Orders adhere to a deterministic state machine enforced at the database controll
   - `PREPARING` orders can only transition to `COMPLETED`.
   - `COMPLETED` orders are final and immutable.
 
+### Order Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant FE as Frontend
+    participant API as Backend API
+    participant DB as MySQL Database
+
+    C->>FE: Add items to cart
+    FE->>FE: Calculate bill breakdown (live)
+    C->>FE: Click "Place Order"
+    FE->>API: POST /api/orders (items array)
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: Validate product prices
+    API->>DB: INSERT INTO orders
+    API->>DB: INSERT INTO order_items (batch)
+    API->>DB: COMMIT
+    API-->>FE: Order confirmed (201)
+    FE->>C: Redirect to /order-success
+
+    Note over FE,API: Staff/Admin view
+    API->>DB: GET all orders
+    API-->>FE: Orders list with items
+    FE->>FE: Staff clicks "Mark as Preparing"
+    FE->>API: PATCH /api/orders/:id/status
+    API->>DB: UPDATE order status
+    FE->>FE: Staff clicks "View Receipt"
+    FE->>FE: Show bill breakdown modal
+    FE->>FE: Print thermal receipt
+```
+
+---
+
+## 🖨️ Thermal Receipt Printing
+
+Staff and Admin users can generate and print thermal-style receipts directly from the Orders page:
+
+### Receipt Contents
+- **Header**: Cafe name, tagline, and logo
+- **Order Info**: Token number, date/time, status, customer name
+- **Items Table**: Item name, quantity × rate, amount
+- **Bill Breakdown**: Subtotal, Packaging Fee, Platform Fee, CGST, SGST, GST on Platform Fee
+- **Totals**: Calculated Total, Rounding Off, Grand Total
+- **Footer**: Thank you message
+
+### How It Works
+1. Staff/Admin clicks the **Receipt** button on any order card.
+2. A modal displays the full bill with itemized breakdown.
+3. Clicking **Print Bill** opens a browser print dialog with a thermal-receipt-formatted layout optimized for 80mm receipt printers.
+
 ---
 
 ## 🔮 Future Enhancements
@@ -499,6 +762,9 @@ Orders adhere to a deterministic state machine enforced at the database controll
 - [ ] Table-side QR Code ordering support
 - [ ] Customer order cancellation within grace window
 - [ ] Dark Mode UI theme
+- [ ] Order analytics dashboard for Admin
+- [ ] Multi-branch / multi-outlet support
+- [ ] Product availability toggle (in-stock / out-of-stock)
 
 ---
 

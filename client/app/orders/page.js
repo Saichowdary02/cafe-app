@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Toast from "@/components/Toast";
+import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
 
 function StatusBadge({ status }) {
     if (status === "PENDING") {
@@ -89,16 +90,15 @@ function OrderProgressBar({ status }) {
             <div className="relative flex items-center justify-between">
                 {/* Connecting background line */}
                 <div className="absolute top-1/2 left-0 h-1 w-full -translate-y-1/2 rounded-full bg-stone-200" />
-                
+
                 {/* Active progress line */}
                 <div
-                    className={`absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500 ${
-                        currentStepIndex === 0
+                    className={`absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500 ${currentStepIndex === 0
                             ? "w-[10%] bg-amber-500"
                             : currentStepIndex === 1
-                            ? "w-[50%] bg-blue-500"
-                            : "w-full bg-emerald-500"
-                    }`}
+                                ? "w-[50%] bg-blue-500"
+                                : "w-full bg-emerald-500"
+                        }`}
                 />
 
                 {steps.map((step, idx) => {
@@ -116,9 +116,8 @@ function OrderProgressBar({ status }) {
                     return (
                         <div key={step.label} className="relative z-10 flex flex-col items-center">
                             <div
-                                className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all duration-300 ${circleClass} ${
-                                    isCurrent && status !== "COMPLETED" ? "scale-110 ring-2 ring-orange-200" : ""
-                                }`}
+                                className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all duration-300 ${circleClass} ${isCurrent && status !== "COMPLETED" ? "scale-110 ring-2 ring-orange-200" : ""
+                                    }`}
                             >
                                 {isDone && idx < currentStepIndex ? (
                                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -129,13 +128,12 @@ function OrderProgressBar({ status }) {
                                 )}
                             </div>
                             <span
-                                className={`mt-1 text-[10px] font-semibold tracking-tight transition-colors ${
-                                    isCurrent
+                                className={`mt-1 text-[10px] font-semibold tracking-tight transition-colors ${isCurrent
                                         ? "text-stone-900 font-bold"
                                         : isDone
-                                        ? "text-stone-600"
-                                        : "text-stone-400"
-                                }`}
+                                            ? "text-stone-600"
+                                            : "text-stone-400"
+                                    }`}
                             >
                                 {step.label}
                             </span>
@@ -157,6 +155,7 @@ export default function OrdersPage() {
     const [error, setError] = useState("");
     const [updatingId, setUpdatingId] = useState(null);
     const [toast, setToast] = useState(null);
+    const [billSettings, setBillSettings] = useState(DEFAULT_BILL_SETTINGS);
 
     // Filters and Search state
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -189,6 +188,23 @@ export default function OrdersPage() {
             localStorage.removeItem("user");
             router.push("/login");
         }
+
+        // Fetch live bill settings so receipt uses admin-configured rates
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        fetch(`${apiUrl}/api/bill/settings`)
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => {
+                if (data?.settings) {
+                    setBillSettings({
+                        packaging_fee_percent: Number(data.settings.packaging_fee_percent),
+                        platform_fee: Number(data.settings.platform_fee),
+                        cgst_percent: Number(data.settings.cgst_percent),
+                        sgst_percent: Number(data.settings.sgst_percent),
+                        platform_fee_gst_percent: Number(data.settings.platform_fee_gst_percent),
+                    });
+                }
+            })
+            .catch((err) => console.error("Failed to fetch bill settings:", err));
     }, []);
 
     const fetchOrders = async (token, role, isManualRefresh = false) => {
@@ -365,7 +381,9 @@ export default function OrdersPage() {
             })
             .join("");
 
-        const grandTotal = Number(order.total_amount || 0).toFixed(2);
+        const subtotal = (order.items || []).reduce((acc, curr) => acc + Number(curr.price || 0) * (curr.quantity || 1), 0);
+        const breakdown = calculateBillBreakdown(subtotal, billSettings);
+        const grandTotal = Number(order.total_amount || breakdown.grand_total).toFixed(2);
         const totalQty = (order.items || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0);
 
         const receiptHtml = `
@@ -448,34 +466,35 @@ export default function OrdersPage() {
         th {
             border-bottom: 1px dashed #777;
             padding: 4px 0;
+            color: #444;
             font-size: 10px;
             text-transform: uppercase;
-            color: #555;
-            font-weight: 700;
         }
         .grand-total-row {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
             margin-top: 6px;
+            padding-top: 4px;
+            border-top: 1px dashed #444;
             font-size: 14px;
             font-weight: 900;
+            color: #000;
         }
         .grand-total-price {
-            font-size: 17px;
-            font-weight: 900;
+            font-size: 16px;
             color: #000;
-            font-family: monospace;
         }
         .footer {
-            margin-top: 10px;
             text-align: center;
+            margin-top: 10px;
             font-size: 10px;
             color: #555;
+            line-height: 1.4;
         }
         .footer-bold {
             font-weight: 700;
-            color: #222;
+            color: #111;
             font-size: 11px;
             margin-bottom: 2px;
         }
@@ -484,18 +503,18 @@ export default function OrdersPage() {
 <body>
     <div class="text-center">
         <div class="header-icon">&#9749;</div>
-        <div class="title">CAFE EXPERIENCE</div>
-        <div class="subtitle">Fresh Chai, Coffee & Delicious Bites</div>
+        <h1 class="title">CAFE EXPERIENCE</h1>
+        <p class="subtitle">Fresh Chai, Coffee &amp; Delicious Bites</p>
     </div>
 
     <div class="divider"></div>
 
     <div class="info-row">
         <span class="info-label">Order Token:</span>
-        <span class="info-value token-value">#${order.id}</span>
+        <span class="token-value">#${order.id}</span>
     </div>
     <div class="info-row">
-        <span class="info-label">Date & Time:</span>
+        <span class="info-label">Date &amp; Time:</span>
         <span class="info-value">${formattedDate}</span>
     </div>
     <div class="info-row">
@@ -535,12 +554,45 @@ export default function OrdersPage() {
         <span class="info-value">${totalQty}</span>
     </div>
     <div class="info-row">
+        <span class="info-label">Subtotal (Food &amp; Snacks):</span>
+        <span class="info-value">&#8377;${breakdown.subtotal.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Packaging Fee (${breakdown.packaging_fee_percent}%):</span>
+        <span class="info-value">&#8377;${breakdown.packaging_fee.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Platform Fee (App fee):</span>
+        <span class="info-value">&#8377;${breakdown.platform_fee.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">CGST (${breakdown.cgst_percent}%):</span>
+        <span class="info-value">&#8377;${breakdown.cgst.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">SGST (${breakdown.sgst_percent}%):</span>
+        <span class="info-value">&#8377;${breakdown.sgst.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">GST on Platform Fee (${breakdown.platform_fee_gst_percent}%):</span>
+        <span class="info-value">&#8377;${breakdown.platform_fee_gst.toFixed(2)}</span>
+    </div>
+    <div class="info-row" style="font-weight: 700;">
+        <span class="info-label">Calculated Total:</span>
+        <span class="info-value">&#8377;${breakdown.calculated_total.toFixed(2)}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Rounding Off (Ceil):</span>
+        <span class="info-value">${breakdown.rounding_off >= 0 ? `+&#8377;${breakdown.rounding_off.toFixed(2)}` : `-&#8377;${Math.abs(breakdown.rounding_off).toFixed(2)}`}</span>
+    </div>
+    <div class="info-row">
         <span class="info-label">Payment Mode:</span>
         <span class="info-value">Direct / Paid</span>
     </div>
     <div class="grand-total-row">
         <span>Grand Total:</span>
-        <span class="grand-total-price">&#8377;${grandTotal}</span>
+        <span class="grand-total-price">&#8377;${breakdown.grand_total.toFixed(2)}</span>
+    </div>
     </div>
 
     <div class="divider"></div>
@@ -664,15 +716,14 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Dashboard Stats Overview Cards */}
-                <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
+                <div className={`mb-8 ${isStaffOrAdmin ? "grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4" : "max-w-xs"}`}>
                     {/* Total Orders Card */}
                     <div
                         onClick={() => setStatusFilter("ALL")}
-                        className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${
-                            statusFilter === "ALL"
+                        className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "ALL"
                                 ? "border-stone-400 bg-stone-100/90 ring-2 ring-stone-400/40"
                                 : "border-stone-200/80 bg-white/90 hover:border-stone-300"
-                        }`}
+                            }`}
                     >
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold tracking-wide uppercase text-stone-600">
@@ -690,95 +741,86 @@ export default function OrdersPage() {
                         </div>
                     </div>
 
-                    {/* Pending Orders Card */}
-                    <div
-                        onClick={() => setStatusFilter(statusFilter === "PENDING" ? "ALL" : "PENDING")}
-                        className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${
-                            statusFilter === "PENDING"
-                                ? "border-amber-400 bg-amber-50/90 ring-2 ring-amber-400/40"
-                                : "border-amber-200/80 bg-amber-50/50 hover:border-amber-300"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold tracking-wide uppercase text-amber-800">
-                                Pending
-                            </span>
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                                ⏳
-                            </span>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-amber-900 sm:text-3xl">
-                                {stats.pending}
-                            </span>
-                            {stats.pending > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                                    Needs action
-                                </span>
-                            )}
-                        </div>
-                    </div>
+                    {/* Admin/Staff Only Metrics (Pending, In Kitchen, Completed) */}
+                    {isStaffOrAdmin && (
+                        <>
+                            {/* Pending Orders Card */}
+                            <div
+                                onClick={() => setStatusFilter(statusFilter === "PENDING" ? "ALL" : "PENDING")}
+                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "PENDING"
+                                        ? "border-amber-400 bg-amber-50/90 ring-2 ring-amber-400/40"
+                                        : "border-amber-200/80 bg-amber-50/50 hover:border-amber-300"
+                                    }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold tracking-wide uppercase text-amber-800">
+                                        Pending
+                                    </span>
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                                        ⏳
+                                    </span>
+                                </div>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-black text-amber-900 sm:text-3xl">
+                                        {stats.pending}
+                                    </span>
+                                    {stats.pending > 0 && (
+                                        <span className="inline-flex items-center rounded-full bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                            Needs action
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
 
-                    {/* Preparing Orders Card */}
-                    <div
-                        onClick={() => setStatusFilter(statusFilter === "PREPARING" ? "ALL" : "PREPARING")}
-                        className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${
-                            statusFilter === "PREPARING"
-                                ? "border-blue-400 bg-blue-50/90 ring-2 ring-blue-400/40"
-                                : "border-blue-200/80 bg-blue-50/50 hover:border-blue-300"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold tracking-wide uppercase text-blue-800">
-                                In Kitchen
-                            </span>
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                                👨‍🍳
-                            </span>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-blue-900 sm:text-3xl">
-                                {stats.preparing}
-                            </span>
-                            <span className="text-xs font-medium text-blue-600">preparing</span>
-                        </div>
-                    </div>
+                            {/* Preparing Orders Card */}
+                            <div
+                                onClick={() => setStatusFilter(statusFilter === "PREPARING" ? "ALL" : "PREPARING")}
+                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "PREPARING"
+                                        ? "border-blue-400 bg-blue-50/90 ring-2 ring-blue-400/40"
+                                        : "border-blue-200/80 bg-blue-50/50 hover:border-blue-300"
+                                    }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold tracking-wide uppercase text-blue-800">
+                                        In Kitchen
+                                    </span>
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                                        👨‍🍳
+                                    </span>
+                                </div>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-black text-blue-900 sm:text-3xl">
+                                        {stats.preparing}
+                                    </span>
+                                    <span className="text-xs font-medium text-blue-600">preparing</span>
+                                </div>
+                            </div>
 
-                    {/* Completed / Total Spent Card */}
-                    <div
-                        onClick={() => setStatusFilter(statusFilter === "COMPLETED" ? "ALL" : "COMPLETED")}
-                        className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${
-                            statusFilter === "COMPLETED"
-                                ? "border-emerald-400 bg-emerald-50/90 ring-2 ring-emerald-400/40"
-                                : "border-emerald-200/80 bg-emerald-50/50 hover:border-emerald-300"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold tracking-wide uppercase text-emerald-800">
-                                {isStaffOrAdmin ? "Completed" : "Total Spent"}
-                            </span>
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                                {isStaffOrAdmin ? "✅" : "💰"}
-                            </span>
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            {isStaffOrAdmin ? (
-                                <>
+                            {/* Completed Card */}
+                            <div
+                                onClick={() => setStatusFilter(statusFilter === "COMPLETED" ? "ALL" : "COMPLETED")}
+                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "COMPLETED"
+                                        ? "border-emerald-400 bg-emerald-50/90 ring-2 ring-emerald-400/40"
+                                        : "border-emerald-200/80 bg-emerald-50/50 hover:border-emerald-300"
+                                    }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold tracking-wide uppercase text-emerald-800">
+                                        Completed
+                                    </span>
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                                        ✅
+                                    </span>
+                                </div>
+                                <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-black text-emerald-900 sm:text-3xl">
                                         {stats.completed}
                                     </span>
                                     <span className="text-xs font-medium text-emerald-600">ready</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-2xl font-black text-emerald-900 sm:text-3xl">
-                                        ₹{stats.totalRevenue.toFixed(0)}
-                                    </span>
-                                    <span className="text-xs font-medium text-emerald-600">spent</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Filter Tabs & Search / Sort Toolbar */}
@@ -787,11 +829,10 @@ export default function OrdersPage() {
                     <div className="flex flex-wrap items-center gap-1.5">
                         <button
                             onClick={() => setStatusFilter("ALL")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
-                                statusFilter === "ALL"
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "ALL"
                                     ? "bg-gray-900 text-white shadow-xs"
                                     : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                            }`}
+                                }`}
                         >
                             <span>All</span>
                             <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "ALL" ? "bg-stone-700 text-white" : "bg-stone-200 text-stone-700"}`}>
@@ -801,11 +842,10 @@ export default function OrdersPage() {
 
                         <button
                             onClick={() => setStatusFilter("PENDING")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
-                                statusFilter === "PENDING"
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "PENDING"
                                     ? "bg-amber-500 text-white shadow-xs"
                                     : "bg-amber-50 text-amber-800 border border-amber-200/60 hover:bg-amber-100"
-                            }`}
+                                }`}
                         >
                             <span>Pending</span>
                             <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "PENDING" ? "bg-amber-700 text-white" : "bg-amber-200 text-amber-900"}`}>
@@ -815,11 +855,10 @@ export default function OrdersPage() {
 
                         <button
                             onClick={() => setStatusFilter("PREPARING")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
-                                statusFilter === "PREPARING"
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "PREPARING"
                                     ? "bg-blue-600 text-white shadow-xs"
                                     : "bg-blue-50 text-blue-800 border border-blue-200/60 hover:bg-blue-100"
-                            }`}
+                                }`}
                         >
                             <span>Preparing</span>
                             <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "PREPARING" ? "bg-blue-800 text-white" : "bg-blue-200 text-blue-900"}`}>
@@ -829,11 +868,10 @@ export default function OrdersPage() {
 
                         <button
                             onClick={() => setStatusFilter("COMPLETED")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
-                                statusFilter === "COMPLETED"
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "COMPLETED"
                                     ? "bg-emerald-600 text-white shadow-xs"
                                     : "bg-emerald-50 text-emerald-800 border border-emerald-200/60 hover:bg-emerald-100"
-                            }`}
+                                }`}
                         >
                             <span>Completed</span>
                             <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "COMPLETED" ? "bg-emerald-800 text-white" : "bg-emerald-200 text-emerald-900"}`}>
@@ -960,15 +998,15 @@ export default function OrdersPage() {
                             {searchQuery || statusFilter !== "ALL"
                                 ? "No matching orders found"
                                 : isStaffOrAdmin
-                                ? "No active orders in the queue"
-                                : "You haven't placed any orders yet"}
+                                    ? "No active orders in the queue"
+                                    : "You haven't placed any orders yet"}
                         </h3>
                         <p className="mx-auto mt-1.5 max-w-sm text-sm text-stone-500">
                             {searchQuery || statusFilter !== "ALL"
                                 ? "Try resetting your search query or switching the status filter tab."
                                 : isStaffOrAdmin
-                                ? "Incoming customer orders will appear here automatically."
-                                : "Treat yourself with our authentic freshly brewed teas, coffees, and delicious snacks!"}
+                                    ? "Incoming customer orders will appear here automatically."
+                                    : "Treat yourself with our authentic freshly brewed teas, coffees, and delicious snacks!"}
                         </p>
 
                         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -1013,13 +1051,12 @@ export default function OrdersPage() {
                                 >
                                     {/* Top Glow Accent */}
                                     <div
-                                        className={`absolute top-0 left-0 right-0 h-1.5 ${
-                                            order.status === "PENDING"
+                                        className={`absolute top-0 left-0 right-0 h-1.5 ${order.status === "PENDING"
                                                 ? "bg-gradient-to-r from-amber-400 to-orange-400"
                                                 : order.status === "PREPARING"
-                                                ? "bg-gradient-to-r from-blue-400 to-indigo-500"
-                                                : "bg-gradient-to-r from-emerald-400 to-teal-500"
-                                        }`}
+                                                    ? "bg-gradient-to-r from-blue-400 to-indigo-500"
+                                                    : "bg-gradient-to-r from-emerald-400 to-teal-500"
+                                            }`}
                                     />
 
                                     <div>
@@ -1220,9 +1257,9 @@ export default function OrdersPage() {
             {/* Thermal / Printable Receipt Modal */}
             {isStaffOrAdmin && receiptOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-xs">
-                    <div className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl transition-all">
+                    <div className="relative w-full max-w-sm flex flex-col rounded-3xl bg-white shadow-2xl transition-all" style={{maxHeight: "90vh"}}>
                         {/* Receipt Header Actions */}
-                        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-5 py-3">
+                        <div className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-stone-50 px-5 py-3 rounded-t-3xl">
                             <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
                                 Cafe Bill Receipt
                             </span>
@@ -1236,8 +1273,8 @@ export default function OrdersPage() {
                             </button>
                         </div>
 
-                        {/* Printable Thermal Receipt Card */}
-                        <div id="cafe-printable-receipt" className="p-6 text-stone-800">
+                        {/* Printable Thermal Receipt Card — scrollable */}
+                        <div id="cafe-printable-receipt" className="overflow-y-auto flex-1 p-6 text-stone-800">
                             <div className="text-center">
                                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600 text-white font-black text-lg shadow-sm">
                                     ☕
@@ -1299,17 +1336,67 @@ export default function OrdersPage() {
 
                             <div className="my-3 border-t border-dashed border-stone-300" />
 
-                            {/* Total Calculation */}
-                            <div className="space-y-1 text-xs">
-                                <div className="flex justify-between text-stone-600">
-                                    <span>Payment Method</span>
-                                    <span className="font-semibold text-stone-800">Direct / Paid</span>
-                                </div>
-                                <div className="flex justify-between text-sm font-black text-gray-900 pt-1">
-                                    <span>Grand Total:</span>
-                                    <span className="text-base text-orange-600">₹{Number(receiptOrder.total_amount).toFixed(2)}</span>
-                                </div>
-                            </div>
+                            {/* Detailed Bill Breakdown */}
+                            {(() => {
+                                const receiptSubtotal = (receiptOrder.items || []).reduce(
+                                    (acc, curr) => acc + Number(curr.price || 0) * (curr.quantity || 1),
+                                    0
+                                );
+                                const b = calculateBillBreakdown(receiptSubtotal, billSettings);
+                                return (
+                                    <div className="space-y-1.5 text-xs text-stone-600">
+                                        <div className="flex justify-between">
+                                            <span>Subtotal <span className="text-[10px] text-stone-400 font-normal">(Food &amp; Snacks)</span></span>
+                                            <span className="font-semibold text-stone-900 font-mono">₹{b.subtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Packaging Fee <span className="rounded-sm bg-stone-100 px-1 py-0.2 text-[9px] font-bold text-stone-600">{b.packaging_fee_percent}%</span></span>
+                                            <span className="font-semibold text-stone-800 font-mono">₹{b.packaging_fee.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Platform Fee <span className="text-[10px] text-stone-400 font-normal">(App fee)</span></span>
+                                            <span className="font-semibold text-stone-800 font-mono">₹{b.platform_fee.toFixed(2)}</span>
+                                        </div>
+
+                                        {/* Taxes Sub-card */}
+                                        <div className="my-1.5 rounded-xl bg-stone-50/80 p-2 space-y-1 text-[11px] border border-stone-200/60">
+                                            <div className="flex justify-between text-stone-600">
+                                                <span>CGST ({b.cgst_percent}%)</span>
+                                                <span className="font-mono font-medium text-stone-800">₹{b.cgst.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-stone-600">
+                                                <span>SGST ({b.sgst_percent}%)</span>
+                                                <span className="font-mono font-medium text-stone-800">₹{b.sgst.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-stone-600">
+                                                <span>GST on Platform Fee ({b.platform_fee_gst_percent}%)</span>
+                                                <span className="font-mono font-medium text-stone-800">₹{b.platform_fee_gst.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between text-stone-700 font-medium">
+                                            <span>Calculated Total</span>
+                                            <span className="font-mono font-bold text-stone-800">₹{b.calculated_total.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-stone-500 text-[11px]">
+                                            <span>Rounding Off (Ceil)</span>
+                                            <span className="font-mono font-semibold text-stone-700">
+                                                {b.rounding_off >= 0 ? `+₹${b.rounding_off.toFixed(2)}` : `-₹${Math.abs(b.rounding_off).toFixed(2)}`}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex justify-between text-stone-600 pt-1 border-t border-stone-100 text-[11px]">
+                                            <span>Payment Method</span>
+                                            <span className="font-semibold text-stone-800">Direct / Paid</span>
+                                        </div>
+
+                                        <div className="flex items-baseline justify-between pt-1.5 text-sm font-black text-gray-900 border-t border-dashed border-stone-300">
+                                            <span className="text-stone-900">Grand Total:</span>
+                                            <span className="text-lg text-orange-600 font-mono">₹{b.grand_total.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="my-4 border-t border-dashed border-stone-300" />
 
@@ -1324,7 +1411,7 @@ export default function OrdersPage() {
                         </div>
 
                         {/* Modal Action Buttons */}
-                        <div className="flex gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3.5">
+                        <div className="flex shrink-0 gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3.5 rounded-b-3xl">
                             <button
                                 type="button"
                                 onClick={() => setReceiptOrder(null)}
@@ -1346,6 +1433,17 @@ export default function OrdersPage() {
                     </div>
                 </div>
             )}
+
+            {/* Floating Quick Action Button: New Order on downmost rightmost side */}
+            <div className="fixed bottom-6 right-6 z-40">
+                <Link
+                    href="/items"
+                    className="inline-flex items-center justify-center rounded-2xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-xl hover:shadow-orange-500/40 active:scale-95"
+                    title="Place New Order"
+                >
+                    <span>+ New Order</span>
+                </Link>
+            </div>
         </div>
     );
 }

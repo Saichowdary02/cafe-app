@@ -12,7 +12,18 @@ export default function Navbar() {
     const [user, setUser] = useState(null);
     const [toast, setToast] = useState(null);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false);
     const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 8);
+        };
+
+        handleScroll();
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -72,7 +83,13 @@ export default function Navbar() {
                     onClose={() => setToast(null)}
                 />
             )}
-            <header className="sticky top-0 z-50 border-b border-amber-900/10 bg-white/80 backdrop-blur-md">
+            <header
+                className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+                    isScrolled
+                        ? "border-b border-stone-200/90 bg-white/95 shadow-md shadow-stone-900/5 backdrop-blur-md"
+                        : "border-b border-amber-900/10 bg-white/85 backdrop-blur-md"
+                }`}
+            >
                 <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
                     {/* Brand Logo */}
                     <Link
@@ -165,19 +182,36 @@ export default function Navbar() {
 
                         {/* ADMIN ONLY */}
                         {isAdmin && (
-                            <Link
-                                href="/manage-products"
-                                className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
-                                    isActive("/manage-products")
-                                        ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
-                                        : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
-                                }`}
-                            >
-                                <span>Manage Products</span>
-                                {isActive("/manage-products") && (
-                                    <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
-                                )}
-                            </Link>
+                            <>
+                                <Link
+                                    href="/manage-products"
+                                    className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
+                                        isActive("/manage-products")
+                                            ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
+                                            : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
+                                    }`}
+                                >
+                                    <span>Manage Products</span>
+                                    {isActive("/manage-products") && (
+                                        <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
+                                    )}
+                                </Link>
+
+                                <Link
+                                    href="/manage-billing"
+                                    className={`relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
+                                        isActive("/manage-billing")
+                                            ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
+                                            : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
+                                    }`}
+                                >
+                                    <span className="text-xs">⚙️</span>
+                                    <span>Bill Settings</span>
+                                    {isActive("/manage-billing") && (
+                                        <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
+                                    )}
+                                </Link>
+                            </>
                         )}
 
                         {/* Profile Button & Dropdown */}
@@ -232,6 +266,31 @@ export default function Navbar() {
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {/* Admin Quick Menu */}
+                                        {isAdmin && (
+                                            <div className="py-2 border-b border-stone-100 space-y-1">
+                                                <p className="px-2 text-[10px] font-extrabold uppercase tracking-wider text-stone-400">
+                                                    Admin Controls
+                                                </p>
+                                                <Link
+                                                    href="/manage-products"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-orange-50 hover:text-orange-600 transition"
+                                                >
+                                                    <span>📦</span>
+                                                    <span>Manage Products</span>
+                                                </Link>
+                                                <Link
+                                                    href="/manage-billing"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-orange-50 hover:text-orange-600 transition"
+                                                >
+                                                    <span>⚙️</span>
+                                                    <span>Bill & Tax Settings</span>
+                                                </Link>
+                                            </div>
+                                        )}
 
                                         {/* Logout Action */}
                                         <div className="pt-3">

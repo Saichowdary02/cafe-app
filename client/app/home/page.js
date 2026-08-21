@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -64,6 +65,73 @@ const HIGHLIGHTS = [
 ];
 
 export default function HomePage() {
+    const [minPrices, setMinPrices] = useState({});
+
+    useEffect(() => {
+        const fetchMinPrices = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+                const response = await fetch(`${apiUrl}/api/products`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const products = data.products || [];
+
+                const prices = {};
+
+                CATEGORIES_SHOWCASE.forEach((cat) => {
+                    const targetKey = cat.categoryKey.toLowerCase();
+                    const matchedProducts = products.filter((p) => {
+                        const productCat = (p.category || "").toLowerCase();
+                        const productName = (p.name || "").toLowerCase();
+
+                        if (targetKey === "chai") {
+                            return (
+                                productCat === "chai" ||
+                                productCat === "tea" ||
+                                productName.includes("chai") ||
+                                productName.includes("tea")
+                            );
+                        }
+                        if (targetKey === "coffee") {
+                            return (
+                                productCat === "coffee" ||
+                                productName.includes("coffee") ||
+                                productName.includes("latte") ||
+                                productName.includes("cappuccino") ||
+                                productName.includes("espresso")
+                            );
+                        }
+                        if (targetKey === "snacks") {
+                            return (
+                                productCat === "snacks" ||
+                                productCat === "snack" ||
+                                productCat === "food"
+                            );
+                        }
+                        return productCat === targetKey;
+                    });
+
+                    if (matchedProducts.length > 0) {
+                        const validPrices = matchedProducts
+                            .map((p) => Number(p.price))
+                            .filter((p) => !isNaN(p) && p >= 0);
+
+                        if (validPrices.length > 0) {
+                            const min = Math.min(...validPrices);
+                            prices[cat.categoryKey] = `From ₹${min}`;
+                        }
+                    }
+                });
+
+                setMinPrices(prices);
+            } catch (error) {
+                console.error("Failed to fetch products for category minimum prices:", error);
+            }
+        };
+
+        fetchMinPrices();
+    }, []);
     return (
         <ProtectedRoute>
             <div className="min-h-screen pb-16">
@@ -183,7 +251,7 @@ export default function HomePage() {
                                             </p>
                                             <div className="mt-2 flex items-center justify-between">
                                                 <span className="rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 border border-orange-200/60">
-                                                    {cat.priceStarting}
+                                                    {minPrices[cat.categoryKey] || cat.priceStarting}
                                                 </span>
                                                 <span className="text-xs font-bold text-orange-600 group-hover:translate-x-0.5 transition-transform">
                                                     Order →
@@ -224,17 +292,27 @@ export default function HomePage() {
                             {HIGHLIGHTS.map((h) => (
                                 <div
                                     key={h.title}
-                                    className="group rounded-2xl border border-stone-100 bg-gradient-to-b from-stone-50/80 to-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+                                    className="group relative overflow-hidden rounded-2xl border border-stone-200/70 bg-gradient-to-b from-stone-50/90 via-white to-white p-5 shadow-sm transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-orange-300 hover:shadow-xl hover:shadow-orange-500/10"
                                 >
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100/90 text-xl shadow-2xs transition-transform duration-300 group-hover:scale-110">
-                                        {h.icon}
+                                    {/* Ambient glow effect on hover */}
+                                    <div className="pointer-events-none absolute -right-6 -bottom-6 h-28 w-28 rounded-full bg-orange-400/0 blur-2xl transition-all duration-500 group-hover:bg-orange-400/20" />
+
+                                    {/* Top accent line indicator on hover */}
+                                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-amber-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                                    <div className="relative z-10">
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100/90 text-2xl shadow-2xs transition-all duration-300 ease-out group-hover:scale-110 group-hover:bg-orange-500 group-hover:shadow-md group-hover:shadow-orange-500/25">
+                                            <span className="transition-transform duration-300 group-hover:scale-110">
+                                                {h.icon}
+                                            </span>
+                                        </div>
+                                        <h3 className="mt-4 text-sm font-bold text-stone-900 transition-colors duration-200 group-hover:text-orange-600">
+                                            {h.title}
+                                        </h3>
+                                        <p className="mt-1.5 text-xs text-stone-600 leading-relaxed transition-colors duration-200 group-hover:text-stone-700">
+                                            {h.description}
+                                        </p>
                                     </div>
-                                    <h3 className="mt-3 text-sm font-bold text-stone-900">
-                                        {h.title}
-                                    </h3>
-                                    <p className="mt-1 text-xs text-stone-600 leading-relaxed">
-                                        {h.description}
-                                    </p>
                                 </div>
                             ))}
                         </div>

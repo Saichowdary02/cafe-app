@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { calculateBillBreakdown, getActiveBillSettings } = require("./billController");
 
 const createOrder = async (req, res) => {
     let connection;
@@ -22,7 +23,7 @@ const createOrder = async (req, res) => {
         // 4. Start transaction
         await connection.beginTransaction();
 
-        let totalAmount = 0;
+        let subtotal = 0;
         const orderItems = [];
 
         // 5. Check every product
@@ -59,11 +60,11 @@ const createOrder = async (req, res) => {
             // Get price from database
             const price = Number(product.price);
 
-            // Calculate subtotal
-            const subtotal = price * quantity;
+            // Calculate item total
+            const itemSubtotal = price * quantity;
 
-            // Add to total
-            totalAmount += subtotal;
+            // Add to subtotal
+            subtotal += itemSubtotal;
 
             // Store order item information
             orderItems.push({
@@ -73,12 +74,17 @@ const createOrder = async (req, res) => {
             });
         }
 
+        // Fetch active bill settings and calculate final bill breakdown
+        const billSettings = await getActiveBillSettings();
+        const billBreakdown = calculateBillBreakdown(subtotal, billSettings);
+        const finalGrandTotal = billBreakdown.grand_total;
+
         // 6. Create order
         const [orderResult] = await connection.execute(
             `INSERT INTO orders
             (user_id, total_amount, status)
             VALUES (?, ?, ?)`,
-            [userId, totalAmount, "PENDING"]
+            [userId, finalGrandTotal, "PENDING"]
         );
 
         const orderId = orderResult.insertId;
@@ -108,7 +114,8 @@ const createOrder = async (req, res) => {
             order: {
                 id: orderId,
                 user_id: userId,
-                total_amount: totalAmount,
+                total_amount: finalGrandTotal,
+                breakdown: billBreakdown,
                 status: "PENDING"
             }
         });

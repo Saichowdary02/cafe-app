@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const testRoutes = require("./routes/testRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const billRoutes = require("./routes/billRoutes");
 
 const pool = require("./config/db");
 
@@ -18,6 +19,8 @@ app.use(express.json());
 
 
 app.use("/api/products", productRoutes);
+app.use("/api/bill", billRoutes);
+app.use("/api/bill-settings", billRoutes);
 // Test server
 app.get("/", (req, res) => {
     res.json({
