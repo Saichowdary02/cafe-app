@@ -184,6 +184,20 @@ export default function Navbar() {
                         {isAdmin && (
                             <>
                                 <Link
+                                    href="/dashboard"
+                                    className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
+                                        isActive("/dashboard")
+                                            ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
+                                            : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
+                                    }`}
+                                >
+                                    <span>Dashboard</span>
+                                    {isActive("/dashboard") && (
+                                        <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
+                                    )}
+                                </Link>
+
+                                <Link
                                     href="/manage-products"
                                     className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
                                         isActive("/manage-products")
@@ -193,6 +207,20 @@ export default function Navbar() {
                                 >
                                     <span>Manage Products</span>
                                     {isActive("/manage-products") && (
+                                        <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
+                                    )}
+                                </Link>
+
+                                <Link
+                                    href="/staff"
+                                    className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
+                                        isActive("/staff")
+                                            ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
+                                            : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
+                                    }`}
+                                >
+                                    <span>Staff</span>
+                                    {isActive("/staff") && (
                                         <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                                     )}
                                 </Link>
@@ -274,12 +302,28 @@ export default function Navbar() {
                                                     Admin Controls
                                                 </p>
                                                 <Link
+                                                    href="/dashboard"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-orange-50 hover:text-orange-600 transition"
+                                                >
+                                                    <span>📊</span>
+                                                    <span>Dashboard</span>
+                                                </Link>
+                                                <Link
                                                     href="/manage-products"
                                                     onClick={() => setProfileOpen(false)}
                                                     className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-orange-50 hover:text-orange-600 transition"
                                                 >
                                                     <span>📦</span>
                                                     <span>Manage Products</span>
+                                                </Link>
+                                                <Link
+                                                    href="/staff"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-orange-50 hover:text-orange-600 transition"
+                                                >
+                                                    <span>👥</span>
+                                                    <span>Staff Management</span>
                                                 </Link>
                                                 <Link
                                                     href="/manage-billing"

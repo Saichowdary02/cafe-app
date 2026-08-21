@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -46,6 +46,59 @@ export default function ManageProductsPage() {
     const [searching, setSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
     const [searchResults, setSearchResults] = useState(null);
+
+    // Live product search — debounced 300ms
+    const searchTimer = useRef(null);
+
+    useEffect(() => {
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+
+        const term = searchTerm.trim();
+
+        if (!term) {
+            setSearchResults(null);
+            setSearchError("");
+            setSearching(false);
+            return;
+        }
+
+        setSearching(true);
+        setSearchError("");
+
+        searchTimer.current = setTimeout(async () => {
+            try {
+                const isNumeric = /^\d+$/.test(term);
+
+                if (isNumeric) {
+                    const response = await fetch(`http://localhost:5000/api/products/${term}`);
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || "Product not found");
+                    setSearchResults([data.product]);
+                } else {
+                    const response = await fetch("http://localhost:5000/api/products");
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || "Failed to fetch products");
+                    const matches = (data.products || []).filter((p) =>
+                        p.name.toLowerCase().includes(term.toLowerCase())
+                    );
+                    if (matches.length === 0) {
+                        setSearchError(`No products found matching "${term}".`);
+                        setSearchResults(null);
+                    } else {
+                        setSearchResults(matches);
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                setSearchError(err.message);
+                setSearchResults(null);
+            } finally {
+                setSearching(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(searchTimer.current);
+    }, [searchTerm]);
 
 
     // ---------- Add product ----------
@@ -220,71 +273,7 @@ export default function ManageProductsPage() {
     };
 
 
-    // ---------- Get Info ----------
-
-    const handleSearch = async (e) => {
-        e.preventDefault();
-
-        setSearchError("");
-        setSearchResults(null);
-
-        const term = searchTerm.trim();
-
-        if (!term) {
-            setSearchError("Enter a product ID or name.");
-            return;
-        }
-
-        const isNumeric = /^\d+$/.test(term);
-
-        try {
-            setSearching(true);
-
-            if (isNumeric) {
-
-                // Exact lookup by ID
-                const response = await fetch(
-                    `http://localhost:5000/api/products/${term}`
-                );
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || "Product not found");
-                }
-
-                setSearchResults([data.product]);
-
-            } else {
-
-                // Fetch all, filter by name (case-insensitive, partial match)
-                const response = await fetch("http://localhost:5000/api/products");
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || "Failed to fetch products");
-                }
-
-                const matches = (data.products || []).filter((p) =>
-                    p.name.toLowerCase().includes(term.toLowerCase())
-                );
-
-                if (matches.length === 0) {
-                    setSearchError(`No products found matching "${term}".`);
-                } else {
-                    setSearchResults(matches);
-                }
-
-            }
-
-        } catch (err) {
-            console.error(err);
-            setSearchError(err.message);
-        } finally {
-            setSearching(false);
-        }
-    };
+    // handleSearch removed — replaced by live useEffect above
 
 
     return (
@@ -315,28 +304,21 @@ export default function ManageProductsPage() {
                         </h2>
 
                         <p className="mt-1 text-sm text-gray-600">
-                            Search by ID (exact) or name (partial match) to find a product&apos;s details and ID.
+                            Search by ID (exact) or name (partial match) — results appear as you type.
                         </p>
 
-                        <form onSubmit={handleSearch} className="mt-4 flex gap-3">
-
+                        <div className="mt-4 relative">
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Product ID or name, e.g. 4 or Mocha"
-                                className="flex-1 rounded-lg border px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                                className="w-full rounded-lg border px-3 py-2 pr-10 text-sm focus:border-orange-500 focus:outline-none"
                             />
-
-                            <button
-                                type="submit"
-                                disabled={searching}
-                                className="rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                            >
-                                {searching ? "Searching..." : "Search"}
-                            </button>
-
-                        </form>
+                            {searching && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin rounded-full border-2 border-stone-200 border-t-orange-500" />
+                            )}
+                        </div>
 
                         {searchError && (
                             <p className="mt-3 text-sm text-red-600">{searchError}</p>

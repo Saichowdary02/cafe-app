@@ -78,7 +78,7 @@ function OrderProgressBar({ status }) {
     const steps = [
         { label: "Placed", key: "PENDING" },
         { label: "Kitchen", key: "PREPARING" },
-        { label: "Ready", key: "COMPLETED" },
+        { label: "Delivered", key: "COMPLETED" },
     ];
 
     let currentStepIndex = 0;
@@ -816,7 +816,7 @@ export default function OrdersPage() {
                                     <span className="text-2xl font-black text-emerald-900 sm:text-3xl">
                                         {stats.completed}
                                     </span>
-                                    <span className="text-xs font-medium text-emerald-600">ready</span>
+                                    <span className="text-xs font-medium text-emerald-600">delivered</span>
                                 </div>
                             </div>
                         </>
@@ -1227,7 +1227,7 @@ export default function OrdersPage() {
                                                             </span>
                                                         ) : (
                                                             <>
-                                                                <span>✅ Mark as Ready / Completed</span>
+                                                                <span>✅ Mark as Delivered</span>
                                                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                                 </svg>

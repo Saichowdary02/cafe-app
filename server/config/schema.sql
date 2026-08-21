@@ -1,58 +1,98 @@
--- Cafe App Database Initialization Script
--- Run this script in MySQL Workbench or MySQL CLI
+-- ============================================================
+-- Cafe App Database Schema
+-- Last updated: 2026-08-21
+-- Tables: users, products, orders, order_items, bill_settings
+-- ============================================================
 
-CREATE DATABASE IF NOT EXISTS cafe_app;
+CREATE DATABASE IF NOT EXISTS cafe_app
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
 USE cafe_app;
 
+-- ============================================================
 -- 1. Users Table
+--    Roles: USER (customer), STAFF (kitchen/counter), ADMIN
+-- ============================================================
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(191) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('USER', 'STAFF', 'ADMIN') NOT NULL DEFAULT 'USER',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(100)  NOT NULL,
+    email       VARCHAR(191)  NOT NULL UNIQUE,
+    password    VARCHAR(255)  NOT NULL,
+    role        ENUM('USER', 'STAFF', 'ADMIN') NOT NULL DEFAULT 'USER',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ============================================================
 -- 2. Products Table
+--    Categories: Chai, Coffee, Snacks
+-- ============================================================
 CREATE TABLE IF NOT EXISTS products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(150) NOT NULL,
-    image TEXT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    category ENUM('Chai', 'Coffee', 'Snacks') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(150)  NOT NULL,
+    image       TEXT          NULL,
+    price       DECIMAL(10,2) NOT NULL,
+    category    ENUM('Chai', 'Coffee', 'Snacks') NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ============================================================
 -- 3. Orders Table
+--    Status flow: PENDING → PREPARING → COMPLETED
+-- ============================================================
 CREATE TABLE IF NOT EXISTS orders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    total_amount DECIMAL(10, 2) NOT NULL,
-    status ENUM('PENDING', 'PREPARING', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT           NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    status       ENUM('PENDING', 'PREPARING', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_orders_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_orders_user_id  ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status   ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_created  ON orders(created_at);
+
+-- ============================================================
 -- 4. Order Items Table
+--    Stores individual line items per order.
+--    price is snapshotted at time of order (not live from products).
+-- ============================================================
 CREATE TABLE IF NOT EXISTS order_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
-    product_id INT NOT NULL,
-    quantity INT NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    CONSTRAINT fk_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    CONSTRAINT fk_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    order_id    INT           NOT NULL,
+    product_id  INT           NOT NULL,
+    quantity    INT           NOT NULL,
+    price       DECIMAL(10,2) NOT NULL,
+    CONSTRAINT fk_items_order
+        FOREIGN KEY (order_id)   REFERENCES orders(id)   ON DELETE CASCADE,
+    CONSTRAINT fk_items_product
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
--- Sample Initial Menu Items (Optional Seed Data)
-INSERT INTO products (name, price, category, image) VALUES
-('Masala Chai', 30.00, 'Chai', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3'),
-('Ginger Chai', 35.00, 'Chai', 'https://images.unsplash.com/photo-1544787219-7f47ccb76574'),
-('Elaichi Chai', 35.00, 'Chai', 'https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8'),
-('Espresso', 90.00, 'Coffee', 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd'),
-('Cappuccino', 120.00, 'Coffee', 'https://images.unsplash.com/photo-1534778101976-62847782c213'),
-('Cold Coffee', 110.00, 'Coffee', 'https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5'),
-('Veg Puff', 40.00, 'Snacks', 'https://images.unsplash.com/photo-1601050690597-df0568f70950'),
-('Paneer Puff', 50.00, 'Snacks', 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec'),
-('Chocolate Cookie', 50.00, 'Snacks', 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e');
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id   ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
+
+-- ============================================================
+-- 5. Bill Settings Table
+--    Single-row config (id = 1) for billing rates.
+--    Auto-created by billController on first request if missing,
+--    but defined here for fresh installs / migrations.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bill_settings (
+    id                      INT PRIMARY KEY AUTO_INCREMENT,
+    packaging_fee_percent   DECIMAL(5,2)  NOT NULL DEFAULT 5.00,
+    platform_fee            DECIMAL(10,2) NOT NULL DEFAULT 5.00,
+    cgst_percent            DECIMAL(5,2)  NOT NULL DEFAULT 2.50,
+    sgst_percent            DECIMAL(5,2)  NOT NULL DEFAULT 2.50,
+    platform_fee_gst_percent DECIMAL(5,2) NOT NULL DEFAULT 18.00,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Seed default billing config row (id = 1)
+INSERT IGNORE INTO bill_settings
+    (id, packaging_fee_percent, platform_fee, cgst_percent, sgst_percent, platform_fee_gst_percent)
+VALUES
+    (1, 5.00, 5.00, 2.50, 2.50, 18.00);

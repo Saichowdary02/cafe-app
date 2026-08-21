@@ -7,6 +7,8 @@ const testRoutes = require("./routes/testRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const billRoutes = require("./routes/billRoutes");
+const staffRoutes = require("./routes/staffRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const pool = require("./config/db");
 
@@ -21,6 +23,8 @@ app.use(express.json());
 app.use("/api/products", productRoutes);
 app.use("/api/bill", billRoutes);
 app.use("/api/bill-settings", billRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 // Test server
 app.get("/", (req, res) => {
     res.json({
