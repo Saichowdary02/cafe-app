@@ -199,7 +199,7 @@ const getMyOrders = async (req, res) => {
 const getAllOrders = async (req, res) => {
     try {
 
-        // Get all orders with customer information
+        // Get orders from the last 24 hours with customer information
         const [orders] = await pool.execute(
             `SELECT
                 o.id,
@@ -212,6 +212,7 @@ const getAllOrders = async (req, res) => {
              FROM orders o
              INNER JOIN users u
                 ON o.user_id = u.id
+             WHERE o.created_at >= NOW() - INTERVAL 24 HOUR
              ORDER BY o.created_at DESC`
         );
 

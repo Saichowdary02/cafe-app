@@ -678,6 +678,14 @@ export default function OrdersPage() {
                                 ? "Real-time kitchen display and customer order dispatch system"
                                 : "Track your delicious orders, preparation progress, and receipts"}
                         </p>
+                        {isStaffOrAdmin && (
+                            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs font-medium text-stone-600">
+                                <svg className="h-3.5 w-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Showing orders from the last 24 hours only
+                            </p>
+                        )}
                     </div>
 
                     {/* Quick Action / Refresh */}
@@ -824,7 +832,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Filter Tabs & Search / Sort Toolbar */}
-                <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-white/90 p-3.5 shadow-xs backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="sticky top-16 z-40 mb-6 flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-white/95 p-3.5 shadow-md shadow-stone-900/5 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
                     {/* Status Tabs */}
                     <div className="flex flex-wrap items-center gap-1.5">
                         <button

@@ -1,4 +1,4 @@
-# ☕ Cafe App — Full-Stack Coffee & Tea Ordering System
+# ☕ Cafe App — Full-Stack Coffee & Tea and Snacks Ordering System
 
 A modern, responsive, full-stack web application designed for cafes and coffee shops. **Cafe App** allows customers to explore categorized beverage and snack menus, manage a shopping cart with live bill breakdown, place transactional orders, and track order statuses in real time. It features a dedicated **Staff** portal for processing incoming orders with thermal receipt printing, and an **Admin** suite for complete product inventory management and dynamic billing configuration.
 

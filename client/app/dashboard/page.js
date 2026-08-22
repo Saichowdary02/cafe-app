@@ -6,12 +6,20 @@ import Navbar from "@/components/Navbar";
 import Toast from "@/components/Toast";
 
 const PERIOD_OPTIONS = [
-    { value: "1h",        label: "Last 1 Hour" },
-    { value: "3h",        label: "Last 3 Hours" },
-    { value: "24h",       label: "Last 24 Hours" },
-    { value: "yesterday", label: "Yesterday" },
-    { value: "3d",        label: "Last 3 Days" },
+    { value: "1h",  label: "Last 1 Hour" },
+    { value: "3h",  label: "Last 3 Hours" },
+    { value: "24h", label: "Last 24 Hours" },
+    { value: "3d",  label: "Last 3 Days" },
+    { value: "7d",  label: "Last 7 Days" },
 ];
+
+// Visual styling per product category
+const CATEGORY_META = {
+    Chai:   { emoji: "🍵", bar: "from-amber-400 to-orange-500" },
+    Coffee: { emoji: "☕", bar: "from-amber-800 to-stone-800" },
+    Snacks: { emoji: "🍪", bar: "from-orange-400 to-red-400" },
+};
+const CATEGORY_META_DEFAULT = { emoji: "🛒", bar: "from-stone-400 to-stone-500" };
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -66,6 +74,25 @@ export default function DashboardPage() {
             currency: "INR",
             maximumFractionDigits: 2,
         }).format(n);
+
+    // Category Performance: compute each category's share of items sold
+    const rawCategories = stats?.category_performance || [];
+    const totalItemsSold = rawCategories.reduce((sum, c) => sum + c.items_sold, 0);
+    const categories = rawCategories.map((c) => ({
+        ...c,
+        share_percent:
+            totalItemsSold > 0
+                ? Math.round((c.items_sold / totalItemsSold) * 100)
+                : 0,
+    }));
+
+    // Peak Hours: find the busiest 2-hour bucket
+    const peakHours = stats?.peak_hours || [];
+    const peakMax = peakHours.reduce((max, b) => Math.max(max, b.order_count), 0);
+    const peakHotIndex = peakHours.reduce(
+        (best, b, i) => (b.order_count > 0 && b.order_count > (peakHours[best]?.order_count ?? 0) ? i : best),
+        -1
+    );
 
     // Stat card data
     const statCards = stats
@@ -290,6 +317,163 @@ export default function DashboardPage() {
                                     </p>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Analytics: Category Performance & Peak Hours */}
+                        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                            {/* Category Performance */}
+                            <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-sm">
+                                <div className="border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-6 py-4">
+                                    <h2 className="text-base font-black text-stone-800">
+                                        ☕ Category Performance
+                                    </h2>
+                                    <p className="mt-0.5 text-xs font-medium text-stone-400">
+                                        Sales mix in the selected period
+                                    </p>
+                                </div>
+
+                                {categories.length > 0 ? (
+                                    <div className="space-y-5 px-6 py-5">
+                                        {categories.map((cat) => {
+                                            const meta =
+                                                CATEGORY_META[cat.category] ||
+                                                CATEGORY_META_DEFAULT;
+                                            return (
+                                                <div key={cat.category}>
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className="text-sm font-bold text-stone-700">
+                                                            {meta.emoji} {cat.category}
+                                                        </span>
+                                                        <span className="shrink-0 text-xs font-extrabold text-stone-500">
+                                                            {cat.share_percent}% ·{" "}
+                                                            {formatCurrency(cat.revenue)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-stone-100">
+                                                        <div
+                                                            className={`h-full rounded-full bg-gradient-to-r ${meta.bar} transition-all duration-500`}
+                                                            style={{
+                                                                width: `${cat.share_percent}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <p className="mt-1.5 text-[11px] font-semibold text-stone-400">
+                                                        {cat.items_sold} items sold across{" "}
+                                                        {cat.orders_count} orders
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 text-2xl">
+                                            ☕
+                                        </div>
+                                        <p className="text-sm font-medium text-stone-400">
+                                            No category sales in this period
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Peak Hours */}
+                            <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-sm">
+                                <div className="border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-6 py-4">
+                                    <h2 className="text-base font-black text-stone-800">
+                                        🕐 Peak Hours
+                                    </h2>
+                                    <p className="mt-0.5 text-xs font-medium text-stone-400">
+                                        Orders by time of day (2-hour slots)
+                                    </p>
+                                </div>
+
+                                {!stats.peak_hours_available ? (
+                                    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+                                            <svg
+                                                className="h-7 w-7 text-amber-500"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={1.5}
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <p className="text-sm font-bold text-stone-700">
+                                            Peak hours need a longer window
+                                        </p>
+                                        <p className="max-w-xs text-xs font-medium text-stone-400">
+                                            Peak hours can be shown based on Last 24
+                                            Hours, Last 3 Days, or Last 7 Days. Switch
+                                            the time period above to view them.
+                                        </p>
+                                    </div>
+                                ) : peakHours.length > 0 ? (
+                                    <div className="space-y-2.5 px-6 py-5">
+                                        {peakHours.map((bucket, index) => {
+                                            const isHot =
+                                                index === peakHotIndex && peakMax > 0;
+                                            const width =
+                                                peakMax > 0
+                                                    ? (bucket.order_count / peakMax) * 100
+                                                    : 0;
+                                            return (
+                                                <div
+                                                    key={bucket.label}
+                                                    className="flex items-center gap-3"
+                                                >
+                                                    <span
+                                                        className={`w-24 shrink-0 text-[10px] font-extrabold tracking-tight ${
+                                                            isHot
+                                                                ? "text-orange-700"
+                                                                : "text-stone-500"
+                                                        }`}
+                                                    >
+                                                        {bucket.label}
+                                                    </span>
+                                                    <div className="h-5 flex-1 overflow-hidden rounded-lg bg-stone-100">
+                                                        <div
+                                                            className={`h-full rounded-lg transition-all duration-500 ${
+                                                                isHot
+                                                                    ? "bg-gradient-to-r from-orange-500 to-red-500"
+                                                                    : "bg-gradient-to-r from-amber-300 to-orange-400"
+                                                            }`}
+                                                            style={{ width: `${width}%` }}
+                                                        />
+                                                    </div>
+                                                    <span
+                                                        className={`w-7 shrink-0 text-right text-[11px] font-extrabold ${
+                                                            isHot
+                                                                ? "text-orange-700"
+                                                                : "text-stone-600"
+                                                        }`}
+                                                    >
+                                                        {bucket.order_count}
+                                                    </span>
+                                                    {isHot && (
+                                                        <span className="text-xs">🔥</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 text-2xl">
+                                            🕐
+                                        </div>
+                                        <p className="text-sm font-medium text-stone-400">
+                                            No orders in this period yet
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Period Badge */}
