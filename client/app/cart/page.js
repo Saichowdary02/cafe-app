@@ -10,6 +10,8 @@ import coffeeImg from "@/app/images/coffee.png";
 import snackImg from "@/app/images/snack.png";
 import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 function getCartItemImage(item) {
     if (item?.image) return item.image;
     const cat = item?.category?.toLowerCase() || "";
@@ -27,6 +29,32 @@ function getCartItemImage(item) {
     return null;
 }
 
+/*
+ * Loads the Razorpay Checkout script once.
+ * Resolves true when window.Razorpay is available.
+ */
+const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+
+        if (typeof window === "undefined") {
+            resolve(false);
+            return;
+        }
+
+        if (window.Razorpay) {
+            resolve(true);
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+
+    });
+};
+
 export default function CartPage() {
 
     const router = useRouter();
@@ -35,6 +63,7 @@ export default function CartPage() {
     const [billSettings, setBillSettings] = useState(DEFAULT_BILL_SETTINGS);
     const [loading, setLoading] = useState(true);
     const [placingOrder, setPlacingOrder] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [error, setError] = useState("");
 
 
@@ -148,12 +177,95 @@ export default function CartPage() {
     );
 
 
-    // Place order
-    const handlePlaceOrder = async () => {
+    /*
+     * Creates the order in the backend.
+     * Shared by both Cash and Online payment.
+     */
+    const createBackendOrder = async (paymentMode) => {
 
-        if (cart.length === 0) {
-            return;
+        /*
+         * Get JWT token.
+         *
+         * Change "token" if your application
+         * uses a different localStorage key.
+         */
+        const token = localStorage.getItem("token");
+
+
+        if (!token) {
+            throw new Error(
+                "You are not authenticated. Please login again."
+            );
         }
+
+
+        /*
+         * Backend expects:
+         *
+         * {
+         *     items: [
+         *         {
+         *             product_id: 4,
+         *             quantity: 2
+         *         }
+         *     ],
+         *     payment_mode: "CASH" | "ONLINE"
+         * }
+         */
+
+        const orderItems = cart.map((item) => ({
+            product_id: item.id,
+            quantity: item.quantity
+        }));
+
+
+        const response = await fetch(
+            `${API_URL}/api/orders`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+
+                body: JSON.stringify({
+                    items: orderItems,
+                    payment_mode: paymentMode
+                })
+            }
+        );
+
+
+        const data = await response.json();
+
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Failed to place order"
+            );
+        }
+
+
+        return data.order;
+
+    };
+
+
+    /*
+     * Clears the cart after a successful order.
+     */
+    const clearCart = () => {
+
+        localStorage.removeItem("cart");
+
+        setCart([]);
+
+    };
+
+
+    // Place order & pay with cash at the counter
+    const handleCashOrder = async () => {
 
         setPlacingOrder(true);
         setError("");
@@ -161,99 +273,18 @@ export default function CartPage() {
 
         try {
 
-            /*
-             * Get JWT token.
-             *
-             * Change "token" if your application
-             * uses a different localStorage key.
-             */
-            const token = localStorage.getItem("token");
+            const order = await createBackendOrder("CASH");
 
+            clearCart();
 
-            if (!token) {
-
-                setError(
-                    "You are not authenticated. Please login again."
-                );
-
-                setPlacingOrder(false);
-
-                return;
-            }
-
-
-            /*
-             * Backend expects:
-             *
-             * {
-             *     items: [
-             *         {
-             *             product_id: 4,
-             *             quantity: 2
-             *         }
-             *     ]
-             * }
-             */
-
-            const orderItems = cart.map((item) => ({
-
-                product_id: item.id,
-
-                quantity: item.quantity
-
-            }));
-
-
-            const response = await fetch(
-                "http://localhost:5000/api/orders",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json",
-
-                        "Authorization": `Bearer ${token}`
-                    },
-
-                    body: JSON.stringify({
-                        items: orderItems
-                    })
-                }
-            );
-
-
-            const data = await response.json();
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    data.message || "Failed to place order"
-                );
-
-            }
-
-
-            console.log(
-                "Order created successfully:",
-                data.order
-            );
-
-
-            /*
-             * Clear cart ONLY after successful
-             * order creation.
-             */
-            localStorage.removeItem("cart");
-
-            setCart([]);
+            setShowPaymentModal(false);
 
 
             /*
              * Redirect to order success page.
              */
             router.push(
-                `/order-success?orderId=${data.order.id}`
+                `/order-success?orderId=${order.id}`
             );
 
 
@@ -270,6 +301,230 @@ export default function CartPage() {
             );
 
         } finally {
+
+            setPlacingOrder(false);
+
+        }
+
+    };
+
+
+    // Place order & pay online via Razorpay
+    const handleOnlineOrder = async () => {
+
+        setPlacingOrder(true);
+        setError("");
+
+
+        try {
+
+            // 1. Create the order in our backend
+            const order = await createBackendOrder("ONLINE");
+
+            const token = localStorage.getItem("token");
+
+
+            // 2. Ask backend to create a Razorpay order
+            const paymentResponse = await fetch(
+                `${API_URL}/api/payments/create`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+
+                    body: JSON.stringify({
+                        order_id: order.id
+                    })
+                }
+            );
+
+
+            const paymentData = await paymentResponse.json();
+
+
+            if (!paymentResponse.ok) {
+                throw new Error(
+                    paymentData.message || "Failed to initiate payment"
+                );
+            }
+
+
+            // 3. Load the Razorpay Checkout script
+            const scriptLoaded = await loadRazorpayScript();
+
+
+            if (!scriptLoaded) {
+                throw new Error(
+                    "Could not load payment gateway. Please check your internet connection."
+                );
+            }
+
+
+            setShowPaymentModal(false);
+
+
+            // 4. Open Razorpay Checkout
+            const razorpay = new window.Razorpay({
+
+                key: paymentData.key_id,
+
+                amount: paymentData.amount,
+
+                currency: paymentData.currency,
+
+                name: "Cafe App",
+
+                description: `Order #${order.id}`,
+
+                order_id: paymentData.razorpay_order_id,
+
+                theme: {
+                    color: "#ea580c"
+                },
+
+                handler: async function (response) {
+
+                    try {
+
+                        /*
+                         * 5. Verify the payment on our backend
+                         * before trusting it.
+                         */
+                        const verifyResponse = await fetch(
+                            `${API_URL}/api/payments/verify`,
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "Authorization": `Bearer ${localStorage.getItem("token")}`
+                                },
+
+                                body: JSON.stringify({
+                                    order_id: order.id,
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_signature: response.razorpay_signature
+                                })
+                            }
+                        );
+
+
+                        if (!verifyResponse.ok) {
+                            throw new Error("Payment verification failed");
+                        }
+
+
+                        clearCart();
+
+                        router.push(
+                            `/order-success?orderId=${order.id}&paid=1`
+                        );
+
+
+                    } catch (verifyError) {
+
+                        console.error(
+                            "Verify payment error:",
+                            verifyError
+                        );
+
+                        setError(
+                            "Payment was made but could not be verified. Contact support with Payment ID: " +
+                            response.razorpay_payment_id
+                        );
+
+                    } finally {
+
+                        setPlacingOrder(false);
+
+                    }
+
+                },
+
+                modal: {
+
+                    ondismiss: function () {
+
+                        setPlacingOrder(false);
+
+                        setError(
+                            "Payment cancelled. Your order was saved but is still unpaid."
+                        );
+
+                    }
+
+                }
+
+            });
+
+
+            /*
+             * Razorpay reports a failed payment
+             * (wrong UPI PIN, insufficient funds, etc.)
+             */
+            razorpay.on("payment.failed", async function (response) {
+
+                console.error(
+                    "Payment failed:",
+                    response.error?.description
+                );
+
+                try {
+
+                    await fetch(
+                        `${API_URL}/api/payments/failed`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${localStorage.getItem("token")}`
+                            },
+
+                            body: JSON.stringify({
+                                order_id: order.id,
+                                razorpay_order_id: paymentData.razorpay_order_id,
+                                reason: response.error?.description || "Payment failed at checkout"
+                            })
+                        }
+                    );
+
+                } catch (failError) {
+
+                    console.error(
+                        "Failed to record payment failure:",
+                        failError
+                    );
+
+                }
+
+                setError(
+                    "Online payment failed. Your order was saved with payment status FAILED."
+                );
+
+            });
+
+
+            razorpay.open();
+
+
+        } catch (error) {
+
+            console.error(
+                "Online payment error:",
+                error
+            );
+
+            setShowPaymentModal(false);
+
+            setError(
+                error.message ||
+                "Unable to start online payment. Please try again."
+            );
 
             setPlacingOrder(false);
 
@@ -574,7 +829,7 @@ export default function CartPage() {
 
                                 {/* Place Order Button */}
                                 <button
-                                    onClick={handlePlaceOrder}
+                                    onClick={() => setShowPaymentModal(true)}
                                     disabled={placingOrder || cart.length === 0}
                                     className="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -609,6 +864,123 @@ export default function CartPage() {
                                 </Link>
                             </div>
                         </div>
+                    )}
+
+
+                    {/* Payment Method Modal */}
+                    {showPaymentModal && (
+
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-sm">
+
+                            <div className="w-full max-w-md rounded-3xl border border-stone-200/80 bg-white p-7 shadow-2xl shadow-stone-900/20">
+
+                                {/* Modal Header */}
+                                <div className="text-center">
+                                    <h2 className="text-2xl font-extrabold text-gray-900">
+                                        Choose Payment Method
+                                    </h2>
+
+                                    <p className="mt-1 text-sm font-medium text-stone-500">
+                                        Grand Total:{" "}
+                                        <span className="font-bold text-orange-600">
+                                            ₹{bill.grand_total.toFixed(2)}
+                                        </span>
+                                    </p>
+                                </div>
+
+
+                                {/* Payment Options */}
+                                <div className="mt-6 space-y-3">
+
+                                    {/* Cash Option */}
+                                    <button
+                                        onClick={handleCashOrder}
+                                        disabled={placingOrder}
+                                        className="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border-2 border-stone-200/90 bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-green-400 hover:bg-green-50/50 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 text-2xl shadow-inner">
+                                            💵
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-base font-bold text-gray-900 group-hover:text-green-700">
+                                                Pay with Cash
+                                            </p>
+
+                                            <p className="mt-0.5 text-xs font-medium text-stone-500">
+                                                Pay at the counter when your order arrives.
+                                            </p>
+                                        </div>
+
+                                        {placingOrder ? (
+                                            <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                                        ) : (
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4 shrink-0 text-stone-300 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-green-600"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2.5}
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+
+                                    {/* UPI / Bank Transfer Option */}
+                                    <button
+                                        onClick={handleOnlineOrder}
+                                        disabled={placingOrder}
+                                        className="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border-2 border-stone-200/90 bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 text-2xl shadow-inner">
+                                            ⚡
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-base font-bold text-gray-900 group-hover:text-blue-700">
+                                                UPI / Bank Transfer
+                                            </p>
+
+                                            <p className="mt-0.5 text-xs font-medium text-stone-500">
+                                                Pay securely via UPI, cards &amp; netbanking.
+                                            </p>
+                                        </div>
+
+                                        {placingOrder ? (
+                                            <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                                        ) : (
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4 shrink-0 text-stone-300 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-blue-600"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2.5}
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                </div>
+
+
+                                {/* Cancel Button */}
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    disabled={placingOrder}
+                                    className="mt-5 w-full cursor-pointer rounded-xl border border-stone-200 px-5 py-3 text-sm font-semibold text-stone-600 transition-all hover:bg-stone-50 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <span>Cancel</span>
+                                </button>
+
+                            </div>
+
+                        </div>
+
                     )}
 
                 </main>

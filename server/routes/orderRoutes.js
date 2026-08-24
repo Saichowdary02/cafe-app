@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const {
-    createOrder,getMyOrders, getAllOrders,updateOrderStatus
+    createOrder,getMyOrders, getAllOrders,updateOrderStatus,updatePaymentStatus
 } = require("../controllers/orderController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -29,6 +29,14 @@ router.patch(
     authMiddleware,
     authorizeRoles("STAFF", "ADMIN"),
     updateOrderStatus
+);
+
+// Staff/Admin confirm cash payment received
+router.patch(
+    "/:id/payment-status",
+    authMiddleware,
+    authorizeRoles("STAFF", "ADMIN"),
+    updatePaymentStatus
 );
 
 module.exports = router;

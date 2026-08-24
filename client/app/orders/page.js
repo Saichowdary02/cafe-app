@@ -44,6 +44,45 @@ function StatusBadge({ status }) {
     );
 }
 
+function PaymentStatusBadge({ mode, status }) {
+    const modeLabel = mode === "ONLINE" ? "UPI / Online" : "Cash";
+    const modeIcon = mode === "ONLINE" ? "⚡" : "💵";
+
+    if (status === "PAID") {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 shadow-xs">
+                <span>{modeIcon}</span>
+                <span>{modeLabel}</span>
+                <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                    Paid
+                </span>
+            </span>
+        );
+    }
+
+    if (status === "FAILED") {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300/80 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-800 shadow-xs">
+                <span>{modeIcon}</span>
+                <span>{modeLabel}</span>
+                <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                    Failed
+                </span>
+            </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 shadow-xs">
+            <span>{modeIcon}</span>
+            <span>{modeLabel}</span>
+            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                {mode === "ONLINE" ? "Pending" : "Unpaid"}
+            </span>
+        </span>
+    );
+}
+
 function formatToIST(utcTimestamp) {
     if (!utcTimestamp) return "";
     const date = new Date(utcTimestamp);
@@ -307,6 +346,47 @@ export default function OrdersPage() {
     const isStaffOrAdmin =
         user?.role === "STAFF" ||
         user?.role === "ADMIN";
+
+    // Staff/Admin confirms cash was received for an order
+    const markCashReceived = async (orderId) => {
+        try {
+            setUpdatingId(orderId);
+            const token = localStorage.getItem("token");
+
+            const response = await fetch(
+                `http://localhost:5000/api/orders/${orderId}/payment-status`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ payment_status: "PAID" }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to update payment");
+            }
+
+            setOrders((currentOrders) =>
+                currentOrders.map((order) =>
+                    order.id === orderId
+                        ? { ...order, payment_status: "PAID" }
+                        : order
+                )
+            );
+
+            showToast(`Cash received for Order #${orderId}! 💵`, "success");
+        } catch (err) {
+            console.error(err);
+            showToast(err.message || `Failed to update Order #${orderId}`, "error");
+        } finally {
+            setUpdatingId(null);
+        }
+    };
 
     // Summary Metrics
     const stats = useMemo(() => {
@@ -587,7 +667,11 @@ export default function OrdersPage() {
     </div>
     <div class="info-row">
         <span class="info-label">Payment Mode:</span>
-        <span class="info-value">Direct / Paid</span>
+        <span class="info-value">${order.payment_mode === "ONLINE" ? "UPI / Online (Razorpay)" : "Cash"}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Payment Status:</span>
+        <span class="info-value">PAID</span>
     </div>
     <div class="grand-total-row">
         <span>Grand Total:</span>
@@ -631,6 +715,18 @@ export default function OrdersPage() {
 
     const handlePrintReceipt = (order) => {
         if (!isStaffOrAdmin) return;
+
+        // Receipts can only be printed for fully paid orders
+        if (order.payment_status !== "PAID") {
+            showToast(
+                order.payment_mode === "CASH"
+                    ? `Cash for Order #${order.id} is not received yet. Mark it as paid first.`
+                    : `Payment for Order #${order.id} is not completed. Receipt is available only after successful payment.`,
+                "error"
+            );
+            return;
+        }
+
         setReceiptOrder(order);
     };
 
@@ -1096,6 +1192,17 @@ export default function OrdersPage() {
                                         {/* Order Progress Stepper */}
                                         <OrderProgressBar status={order.status} />
 
+                                        {/* Payment Info */}
+                                        <div className="mt-3 flex items-center justify-between rounded-xl border border-stone-100 bg-stone-50/80 px-3 py-2">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                                                Payment
+                                            </span>
+                                            <PaymentStatusBadge
+                                                mode={order.payment_mode || "CASH"}
+                                                status={order.payment_status || "PENDING"}
+                                            />
+                                        </div>
+
                                         {/* Customer info — STAFF / ADMIN only */}
                                         {isStaffOrAdmin && (
                                             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-stone-100 bg-stone-50/90 p-3 shadow-2xs">
@@ -1171,7 +1278,17 @@ export default function OrdersPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrintReceipt(order)}
-                                                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-1.5 text-xs font-bold text-stone-700 shadow-2xs transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 active:scale-95"
+                                                    disabled={order.payment_status !== "PAID"}
+                                                    title={
+                                                        order.payment_status === "PAID"
+                                                            ? "Print receipt"
+                                                            : "Receipt available only after successful payment"
+                                                    }
+                                                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold shadow-2xs transition active:scale-95 ${
+                                                        order.payment_status === "PAID"
+                                                            ? "cursor-pointer border-stone-200 bg-stone-50/80 text-stone-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
+                                                            : "cursor-not-allowed border-stone-200/60 bg-stone-100/60 text-stone-400"
+                                                    }`}
                                                 >
                                                     <svg
                                                         className="h-3.5 w-3.5"
@@ -1187,6 +1304,11 @@ export default function OrdersPage() {
                                                         />
                                                     </svg>
                                                     <span>Receipt</span>
+                                                    {order.payment_status !== "PAID" && (
+                                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                        </svg>
+                                                    )}
                                                 </button>
                                             )}
                                         </div>
@@ -1194,6 +1316,33 @@ export default function OrdersPage() {
                                         {/* Actions — STAFF / ADMIN only */}
                                         {isStaffOrAdmin && (
                                             <div className="mt-4 space-y-2">
+                                                {/* Cash collection — only for unpaid cash orders */}
+                                                {(order.payment_mode || "CASH") === "CASH" &&
+                                                    (order.payment_status || "PENDING") === "PENDING" && (
+                                                        <button
+                                                            onClick={() => markCashReceived(order.id)}
+                                                            disabled={updatingId === order.id}
+                                                            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:to-teal-700 hover:shadow-md hover:shadow-emerald-500/30 active:scale-95 disabled:opacity-50"
+                                                        >
+                                                            {updatingId === order.id ? (
+                                                                <span className="flex items-center gap-2">
+                                                                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                                                    </svg>
+                                                                    Updating...
+                                                                </span>
+                                                            ) : (
+                                                                <>
+                                                                    <span>💵 Mark Cash Received</span>
+                                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )}
+
                                                 {order.status === "PENDING" && (
                                                     <button
                                                         onClick={() => updateStatus(order.id, "PREPARING")}
@@ -1395,7 +1544,9 @@ export default function OrdersPage() {
 
                                         <div className="flex justify-between text-stone-600 pt-1 border-t border-stone-100 text-[11px]">
                                             <span>Payment Method</span>
-                                            <span className="font-semibold text-stone-800">Direct / Paid</span>
+                                            <span className="font-semibold text-emerald-700">
+                                                {(receiptOrder.payment_mode === "ONLINE" ? "UPI / Online" : "Cash")} • PAID
+                                            </span>
                                         </div>
 
                                         <div className="flex items-baseline justify-between pt-1.5 text-sm font-black text-gray-900 border-t border-dashed border-stone-300">

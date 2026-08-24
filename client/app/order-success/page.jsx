@@ -1,13 +1,16 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
 
     const searchParams = useSearchParams();
 
     const orderId = searchParams.get("orderId");
+
+    const isPaid = searchParams.get("paid") === "1";
 
 
     return (
@@ -58,9 +61,15 @@ export default function OrderSuccessPage() {
                             Status
                         </span>
 
-                        <span className="font-semibold text-orange-600">
-                            PENDING
-                        </span>
+                        {isPaid ? (
+                            <span className="font-semibold text-green-600">
+                                PAID (Online)
+                            </span>
+                        ) : (
+                            <span className="font-semibold text-orange-600">
+                                PENDING
+                            </span>
+                        )}
 
                     </div>
 
@@ -93,4 +102,24 @@ export default function OrderSuccessPage() {
         </div>
 
     );
+}
+
+export default function OrderSuccessPage() {
+
+    return (
+
+        <Suspense
+            fallback={
+                <div className="flex min-h-screen items-center justify-center">
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            }
+        >
+
+            <OrderSuccessContent />
+
+        </Suspense>
+
+    );
+
 }

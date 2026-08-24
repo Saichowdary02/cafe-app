@@ -3,7 +3,7 @@ const pool = require("../config/db");
 const getAllProducts = async (req, res) => {
     try {
         const [products] = await pool.execute(
-            `SELECT id, name, image, price, category, created_at
+            `SELECT id, name, image, price, description, category, created_at
              FROM products
              ORDER BY category, name`
         );
@@ -22,7 +22,7 @@ const getAllProducts = async (req, res) => {
 };
 const createProduct = async (req, res) => {
     try {
-        const { name, price, category, image } = req.body;
+        const { name, price, category, image, description } = req.body;
 
         // Validate required fields
         if (!name || price === undefined || !category) {
@@ -47,14 +47,21 @@ const createProduct = async (req, res) => {
             });
         }
 
+        // Validate description length
+        if (description && String(description).length > 500) {
+            return res.status(400).json({
+                message: "Description cannot exceed 500 characters"
+            });
+        }
+
         const [result] = await pool.execute(
-            `INSERT INTO products (name, price, category, image)
-             VALUES (?, ?, ?, ?)`,
-            [name, price, category, image || null]
+            `INSERT INTO products (name, price, description, category, image)
+             VALUES (?, ?, ?, ?, ?)`,
+            [name, price, description || null, category, image || null]
         );
 
         const [products] = await pool.execute(
-            `SELECT id, name, image, price, category, created_at
+            `SELECT id, name, image, price, description, category, created_at
              FROM products
              WHERE id = ?`,
             [result.insertId]
@@ -78,7 +85,7 @@ const getProductById = async (req, res) => {
         const { id } = req.params;
 
         const [products] = await pool.execute(
-            `SELECT id, name, image, price, category, created_at
+            `SELECT id, name, image, price, description, category, created_at
              FROM products
              WHERE id = ?`,
             [id]
@@ -105,7 +112,7 @@ const getProductById = async (req, res) => {
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, price, category, image } = req.body;
+        const { name, price, category, image, description } = req.body;
 
         // Check if product exists
         const [existingProducts] = await pool.execute(
@@ -142,14 +149,22 @@ const updateProduct = async (req, res) => {
             });
         }
 
+        // Validate description length
+        if (description && String(description).length > 500) {
+            return res.status(400).json({
+                message: "Description cannot exceed 500 characters"
+            });
+        }
+
         // Update product
         await pool.execute(
             `UPDATE products
-             SET name = ?, price = ?, category = ?, image = ?
+             SET name = ?, price = ?, description = ?, category = ?, image = ?
              WHERE id = ?`,
             [
                 name,
                 price,
+                description || null,
                 category,
                 image || null,
                 id
@@ -158,7 +173,7 @@ const updateProduct = async (req, res) => {
 
         // Get updated product
         const [products] = await pool.execute(
-            `SELECT id, name, image, price, category, created_at
+            `SELECT id, name, image, price, description, category, created_at
              FROM products
              WHERE id = ?`,
             [id]

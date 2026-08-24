@@ -9,6 +9,7 @@ const CATEGORIES = ["Chai", "Coffee", "Snacks"];
 const EMPTY_ADD_FORM = {
     name: "",
     price: "",
+    description: "",
     category: "Chai",
     image: "",
 };
@@ -17,6 +18,7 @@ const EMPTY_UPDATE_FORM = {
     id: "",
     name: "",
     price: "",
+    description: "",
     category: "Chai",
     image: "",
 };
@@ -133,6 +135,7 @@ export default function ManageProductsPage() {
                 body: JSON.stringify({
                     name: addForm.name,
                     price: Number(addForm.price),
+                    description: addForm.description || null,
                     category: addForm.category,
                     image: addForm.image || null,
                 }),
@@ -195,6 +198,7 @@ export default function ManageProductsPage() {
                     body: JSON.stringify({
                         name: updateForm.name,
                         price: Number(updateForm.price),
+                        description: updateForm.description || null,
                         category: updateForm.category,
                         image: updateForm.image || null,
                     }),
@@ -356,6 +360,11 @@ export default function ManageProductsPage() {
                                             <p className="text-sm text-gray-600">
                                                 ₹{Number(product.price).toFixed(2)}
                                             </p>
+                                            {product.description && (
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {product.description}
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div className="rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-700">
@@ -394,6 +403,25 @@ export default function ManageProductsPage() {
                                     }
                                     className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Description
+                                </label>
+                                <textarea
+                                    rows="3"
+                                    maxLength="500"
+                                    value={addForm.description}
+                                    onChange={(e) =>
+                                        setAddForm({ ...addForm, description: e.target.value })
+                                    }
+                                    placeholder="e.g. Freshly brewed with hand-pounded elaichi and premium tea leaves"
+                                    className="mt-1 w-full resize-none rounded-lg border px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                                />
+                                <p className="mt-1 text-right text-xs text-gray-400">
+                                    {addForm.description.length}/500
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -507,6 +535,25 @@ export default function ManageProductsPage() {
                                     }
                                     className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Description
+                                </label>
+                                <textarea
+                                    rows="3"
+                                    maxLength="500"
+                                    value={updateForm.description}
+                                    onChange={(e) =>
+                                        setUpdateForm({ ...updateForm, description: e.target.value })
+                                    }
+                                    placeholder="e.g. Freshly brewed with hand-pounded elaichi and premium tea leaves"
+                                    className="mt-1 w-full resize-none rounded-lg border px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                                />
+                                <p className="mt-1 text-right text-xs text-gray-400">
+                                    {updateForm.description.length}/500
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

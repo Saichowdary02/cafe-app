@@ -1,6 +1,6 @@
 # ☕ Cafe App — Full-Stack Coffee & Tea and Snacks Ordering System
 
-A modern, responsive, full-stack web application designed for cafes and coffee shops. **Cafe App** allows customers to explore categorized beverage and snack menus, manage a shopping cart with live bill breakdown, place transactional orders, and track order statuses in real time. It features a dedicated **Staff** portal for processing incoming orders with thermal receipt printing, and an **Admin** suite for complete product inventory management and dynamic billing configuration.
+A modern, responsive, full-stack web application designed for cafes and coffee shops. **Cafe App** allows customers to explore categorized beverage and snack menus with rich product descriptions, manage a shopping cart with live bill breakdown, place transactional orders, and pay via **Cash** or **UPI / Bank Transfer (Razorpay)**. It features a dedicated **Staff** portal for processing incoming orders, confirming cash collection, and printing thermal receipts (only for paid orders), plus an **Admin** suite for complete product inventory management and dynamic billing configuration.
 
 ---
 
@@ -11,6 +11,7 @@ A modern, responsive, full-stack web application designed for cafes and coffee s
 - [Tech Stack](#-tech-stack)
 - [Key Features & Role-Based Access (RBAC)](#-key-features--role-based-access-rbac)
 - [Billing & Tax Calculation Engine](#-billing--tax-calculation-engine)
+- [Payment System (Cash + Razorpay)](#-payment-system-cash--razorpay)
 - [Database Design & Schema](#-database-design--schema)
 - [API Documentation](#-api-documentation)
 - [Project Directory Structure](#-project-directory-structure)
@@ -20,7 +21,8 @@ A modern, responsive, full-stack web application designed for cafes and coffee s
   - [2. Backend Setup](#2-backend-setup)
   - [3. Frontend Setup](#3-frontend-setup)
 - [Security & Architecture Best Practices](#-security--architecture-best-practices)
-- [Order Lifecycle State Machine](#-order-lifecycle-state-machine)
+- [Order & Payment Lifecycle](#-order--payment-lifecycle)
+- [Thermal Receipt Printing](#️-thermal-receipt-printing)
 - [Future Enhancements](#-future-enhancements)
 
 ---
@@ -28,9 +30,9 @@ A modern, responsive, full-stack web application designed for cafes and coffee s
 ## 🌟 Overview
 
 Cafe App streamlines the digital ordering workflow for beverage outlets:
-- **Customers** register, browse freshly curated menus (Chai, Coffee, Snacks), customize cart quantities, view a live itemized bill breakdown (including GST, packaging fees, and platform charges), and place orders.
-- **Baristas / Staff** receive customer orders with live status badges, advance orders through preparation stages, view detailed receipts with full tax breakdowns, and print thermal bills.
-- **Store Managers / Admins** enjoy full inventory controls (Create, Read, Update, Delete menu items), can inspect entire order histories, configure billing parameters (tax rates, packaging fees, platform charges) via a dedicated settings page, and generate printed receipts.
+- **Customers** register, browse freshly curated menus (Chai, Coffee, Snacks) with product descriptions ("See more" for the full text), customize cart quantities, view a live itemized bill breakdown (including GST, packaging fees, and platform charges), and place orders paid via **Cash** or **UPI / Bank Transfer (Razorpay Checkout)**.
+- **Baristas / Staff** receive customer orders with live status badges, advance orders through preparation stages, confirm **cash collection** ("Mark Cash Received"), view detailed receipts with full tax breakdowns, and print thermal bills — available only once an order's payment is settled.
+- **Store Managers / Admins** enjoy full inventory controls (Create, Read, Update, Delete menu items with descriptions), can inspect entire order histories with payment status, configure billing parameters (tax rates, packaging fees, platform charges) via a dedicated settings page, and generate printed receipts.
 
 ---
 
@@ -45,6 +47,7 @@ graph TD
         AuthGuard[ProtectedRoute & Role Guard]
         State[LocalStorage / Client State]
         BillCalc["Bill Calculator (lib/billCalculator.js)"]
+        RzpCheckout["Razorpay Checkout (checkout.js)"]
     end
 
     subgraph API ["Backend (Node.js + Express 5)"]
@@ -53,17 +56,26 @@ graph TD
         RoleMW[Role-Based Access Middleware]
         Controllers[Business Logic Controllers]
         BillCtrl["Bill Controller (calculateBillBreakdown)"]
+        PayCtrl["Payment Controller (create / verify / failed)"]
+        RzpClient["Razorpay SDK (config/razorpay.js)"]
         DBPool[MySQL2 Promise Connection Pool]
     end
 
     subgraph Storage ["Database (MySQL)"]
-        Tables["Users, Products, Orders, Order_Items, Bill_Settings"]
+        Tables["Users, Products, Orders, Order_Items, Bill_Settings, Payments"]
+    end
+
+    subgraph Gateway ["Razorpay Cloud (Test Mode)"]
+        RzpAPI["Razorpay Orders & Checkout API"]
     end
 
     UI -->|HTTP / JSON Requests with Bearer Token| Router
+    RzpCheckout -->|Payment modal| RzpAPI
     Router --> AuthMW
     AuthMW --> RoleMW
     RoleMW --> Controllers
+    PayCtrl --> RzpClient
+    RzpClient -->|Create orders / verify| RzpAPI
     Controllers -->|Transactions & Parameterized Queries| DBPool
     BillCtrl -->|Read/Write bill_settings| DBPool
     DBPool --> Tables
@@ -77,6 +89,7 @@ graph TD
 3. **Stateless Authentication**: Authenticated sessions rely on secure JSON Web Tokens (JWT) signed with expiration times.
 4. **Dual Bill Calculation**: Bill breakdown logic is mirrored in both the frontend (`lib/billCalculator.js`) and backend (`controllers/billController.js`) to ensure consistent totals across cart, receipts, and order records.
 5. **Dynamic Configuration**: Billing parameters (tax rates, fees) are stored in the database and fetched at runtime, allowing admins to update them without code changes.
+6. **Trusted Server-Side Payments**: Razorpay order amounts are always read from the database (never the client), and every online payment is confirmed via HMAC-SHA256 signature verification before an order is marked `PAID`.
 
 ---
 
@@ -97,6 +110,7 @@ graph TD
 | **Express.js** | `^5.2.1` | REST API routing and HTTP server |
 | **MySQL2** | `^3.23.3` | MySQL client with Promise & Connection Pooling |
 | **JSONWebToken** | `^9.0.3` | Token-based stateless authentication |
+| **Razorpay** | `^2.9.8` | Official Razorpay SDK for online order creation |
 | **bcrypt** | `^6.0.0` | Salted password hashing |
 | **CORS** | `^2.8.6` | Cross-Origin Resource Sharing configuration |
 | **dotenv** | `^17.4.2` | Environment variable management |
@@ -114,18 +128,20 @@ The system supports three user roles: `USER`, `STAFF`, and `ADMIN`.
 | Feature | Customer (`USER`) | Staff (`STAFF`) | Admin (`ADMIN`) |
 | :--- | :---: | :---: | :---: |
 | Account Registration & Login | ✅ | ✅ | ✅ |
-| Browse Categorized Menu | ✅ | ✅ | ✅ |
+| Browse Categorized Menu (with descriptions) | ✅ | ✅ | ✅ |
 | Manage Shopping Cart | ✅ | ✅ | ✅ |
 | View Live Bill Breakdown in Cart | ✅ | ✅ | ✅ |
-| Place Orders (Transactional) | ✅ | ✅ | ✅ |
-| View Personal Order History | ✅ | ✅ | ✅ |
+| Place Orders — Pay with Cash | ✅ | ✅ | ✅ |
+| Place Orders — Pay Online (UPI / Cards via Razorpay) | ✅ | ✅ | ✅ |
+| View Personal Order History (with payment status) | ✅ | ✅ | ✅ |
 | View All Customer Orders | ❌ | ✅ | ✅ |
 | View Order Dashboard Stats (Pending/Preparing/Completed) | ❌ | ✅ | ✅ |
 | Update Order Status (`PREPARING` / `COMPLETED`) | ❌ | ✅ | ✅ |
-| View Receipt with Full Tax Breakdown | ❌ | ✅ | ✅ |
-| Print Thermal Bill / Receipt | ❌ | ✅ | ✅ |
-| Create New Products | ❌ | ❌ | ✅ |
-| Edit Product Price, Category & Image | ❌ | ❌ | ✅ |
+| Mark Cash Payment as Received (`PENDING` → `PAID`) | ❌ | ✅ | ✅ |
+| View Receipt with Full Tax Breakdown (paid orders) | ❌ | ✅ | ✅ |
+| Print Thermal Bill / Receipt (paid orders only) | ❌ | ✅ | ✅ |
+| Create New Products (with description) | ❌ | ❌ | ✅ |
+| Edit Product Price, Category, Image & Description | ❌ | ❌ | ✅ |
 | Delete Menu Items | ❌ | ❌ | ✅ |
 | Configure Bill Settings (Tax Rates, Fees) | ❌ | ❌ | ✅ |
 
@@ -136,9 +152,9 @@ The system supports three user roles: `USER`, `STAFF`, and `ADMIN`.
 | `/home` | Hero landing & feature showcase | All (public) |
 | `/login` | User authentication | All (public) |
 | `/register` | User registration | All (public) |
-| `/items` | Categorized menu with 'Add to Cart' | All (authenticated) |
-| `/cart` | Shopping cart with live bill breakdown & checkout | All (authenticated) |
-| `/orders` | Order history & status tracking | All (authenticated, role-filtered views) |
+| `/items` | Categorized menu with descriptions & 'Add to Cart' | All (authenticated) |
+| `/cart` | Shopping cart with bill breakdown & payment method selection (Cash / UPI) | All (authenticated) |
+| `/orders` | Order history, payment status tracking & receipts | All (authenticated, role-filtered views) |
 | `/order-success` | Post-checkout confirmation screen | All (authenticated) |
 | `/manage-products` | Admin CRUD suite (Add, Edit, Delete, Search) | Admin only |
 | `/manage-billing` | Admin bill settings configuration | Admin only |
@@ -235,15 +251,62 @@ For an order with Subtotal = ₹165.00 and default settings:
 
 ---
 
+## 💳 Payment System (Cash + Razorpay)
+
+After clicking **Place Order** on the cart page, the customer chooses a payment method from a modal:
+
+### 1) Pay with Cash
+- The order is created with `payment_mode = CASH` and `payment_status = PENDING` (pay at the counter).
+- Staff/Admin see a **"💵 Mark Cash Received"** button on unpaid cash orders in the Orders page.
+- Clicking it calls `PATCH /api/orders/:id/payment-status`, which flips `payment_status` to `PAID` (one-way, and only for cash orders) and logs the collection in the `payments` table.
+
+### 2) UPI / Bank Transfer (Razorpay)
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant FE as Frontend (Cart)
+    participant API as Backend API
+    participant RZP as Razorpay Cloud
+
+    C->>FE: Choose "UPI / Bank Transfer"
+    FE->>API: POST /api/orders (payment_mode: ONLINE)
+    FE->>API: POST /api/payments/create (order_id)
+    API->>API: Read amount from DB (never client)
+    API->>RZP: Create Razorpay order (amount in paise)
+    API-->>FE: razorpay_order_id + key_id + amount
+    FE->>RZP: Open Razorpay Checkout (checkout.js)
+    RZP-->>FE: Payment success / failure / dismissed
+    alt Payment successful
+        FE->>API: POST /api/payments/verify (order_id, payment_id, signature)
+        API->>API: HMAC-SHA256 signature check
+        API->>API: orders.payment_status = PAID, payments row = SUCCESS
+        FE->>C: Redirect to /order-success?paid=1 (PAID Online)
+    else Payment failed
+        FE->>API: POST /api/payments/failed (order_id, reason)
+        API->>API: orders.payment_status = FAILED
+    end
+```
+
+### Security Rules
+- The payable amount is **always read from the database** (converted to paise server-side) — the client can never set it.
+- Every payment endpoint requires a valid **JWT**, and users can only pay for **their own** orders (ownership checks).
+- The final trust decision is **server-side signature verification**: `HMAC_SHA256(razorpay_order_id + "|" + razorpay_payment_id, RAZORPAY_KEY_SECRET)`.
+- Receipt printing is **locked** until `payment_status = PAID`.
+
+> Detailed flow documentation also lives in [`payment.md`](payment.md).
+
+---
+
 ## 🗄 Database Design & Schema
 
-The relational database consists of **five** core tables:
+The relational database consists of **six** core tables:
 
 ```mermaid
 erDiagram
     USERS ||--o{ ORDERS : places
     ORDERS ||--|{ ORDER_ITEMS : contains
     PRODUCTS ||--o{ ORDER_ITEMS : referenced_in
+    ORDERS ||--o{ PAYMENTS : "paid via"
     BILL_SETTINGS ||--|| BILL_SETTINGS : "singleton config"
 
     USERS {
@@ -260,6 +323,7 @@ erDiagram
         varchar name
         varchar image
         decimal price
+        varchar description "up to 500 chars"
         enum category "Chai | Coffee | Snacks"
         timestamp created_at
     }
@@ -269,6 +333,8 @@ erDiagram
         int user_id FK
         decimal total_amount
         enum status "PENDING | PREPARING | COMPLETED"
+        enum payment_mode "CASH | ONLINE"
+        enum payment_status "PENDING | PAID | FAILED"
         timestamp created_at
     }
 
@@ -278,6 +344,18 @@ erDiagram
         int product_id FK
         int quantity
         decimal price
+    }
+
+    PAYMENTS {
+        int id PK
+        int order_id FK
+        enum method "CASH | RAZORPAY"
+        varchar razorpay_order_id
+        varchar razorpay_payment_id
+        varchar razorpay_signature
+        decimal amount
+        enum status "PENDING | SUCCESS | FAILED"
+        timestamp created_at
     }
 
     BILL_SETTINGS {

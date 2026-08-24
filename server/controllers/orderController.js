@@ -5,10 +5,13 @@ const createOrder = async (req, res) => {
     let connection;
 
     try {
-        const { items } = req.body;
+        const { items, payment_mode } = req.body;
 
         // 1. Get logged-in user's ID from JWT
         const userId = req.user.id;
+
+        // 1.1 Payment mode: CASH (default) or ONLINE (Razorpay)
+        const orderPaymentMode = payment_mode === "ONLINE" ? "ONLINE" : "CASH";
 
         // 2. Validate items
         if (!items || !Array.isArray(items) || items.length === 0) {
@@ -82,9 +85,9 @@ const createOrder = async (req, res) => {
         // 6. Create order
         const [orderResult] = await connection.execute(
             `INSERT INTO orders
-            (user_id, total_amount, status)
-            VALUES (?, ?, ?)`,
-            [userId, finalGrandTotal, "PENDING"]
+            (user_id, total_amount, status, payment_mode, payment_status)
+            VALUES (?, ?, ?, ?, ?)`,
+            [userId, finalGrandTotal, "PENDING", orderPaymentMode, "PENDING"]
         );
 
         const orderId = orderResult.insertId;
@@ -116,7 +119,9 @@ const createOrder = async (req, res) => {
                 user_id: userId,
                 total_amount: finalGrandTotal,
                 breakdown: billBreakdown,
-                status: "PENDING"
+                status: "PENDING",
+                payment_mode: orderPaymentMode,
+                payment_status: "PENDING"
             }
         });
 
@@ -154,6 +159,8 @@ const getMyOrders = async (req, res) => {
                 user_id,
                 total_amount,
                 status,
+                payment_mode,
+                payment_status,
                 created_at
              FROM orders
              WHERE user_id = ?
@@ -208,6 +215,8 @@ const getAllOrders = async (req, res) => {
                 u.email AS user_email,
                 o.total_amount,
                 o.status,
+                o.payment_mode,
+                o.payment_status,
                 o.created_at
              FROM orders o
              INNER JOIN users u
@@ -353,6 +362,100 @@ const updateOrderStatus = async (req, res) => {
     }
 };
 
+/*
+ * Staff/Admin marks a CASH order's payment as received (PAID).
+ * Online orders are managed automatically by the Razorpay flow.
+ */
+const updatePaymentStatus = async (req, res) => {
+    try {
+        // 1. Get order ID and requested payment status
+        const { id } = req.params;
+        const { payment_status } = req.body;
+
+        // 2. Validate payment status
+        if (!payment_status) {
+            return res.status(400).json({
+                message: "Payment status is required"
+            });
+        }
+
+        // Staff can only confirm cash collection
+        if (payment_status !== "PAID") {
+            return res.status(400).json({
+                message: "Only 'PAID' is allowed here"
+            });
+        }
+
+        // 3. Find the order
+        const [orders] = await pool.execute(
+            `SELECT id, total_amount, payment_mode, payment_status
+             FROM orders
+             WHERE id = ?`,
+            [id]
+        );
+
+        if (orders.length === 0) {
+            return res.status(404).json({
+                message: "Order not found"
+            });
+        }
+
+        const order = orders[0];
+
+        // 4. Online payments cannot be changed manually
+        if (order.payment_mode !== "CASH") {
+            return res.status(400).json({
+                message: "Online payments are managed automatically by Razorpay"
+            });
+        }
+
+        // 5. Only pending cash payments can be marked paid
+        if (order.payment_status !== "PENDING") {
+            return res.status(400).json({
+                message: "This payment is already settled"
+            });
+        }
+
+        // 6. Mark cash as received
+        await pool.execute(
+            `UPDATE orders
+             SET payment_status = 'PAID'
+             WHERE id = ?`,
+            [id]
+        );
+
+        // 7. Record it in the payments table (best effort)
+        try {
+            await pool.execute(
+                `INSERT INTO payments
+                (order_id, method, amount, status)
+                VALUES (?, 'CASH', ?, 'SUCCESS')`,
+                [order.id, Number(order.total_amount)]
+            );
+        } catch (dbError) {
+            console.error("Failed to record cash payment:", dbError.message);
+        }
+
+        // 8. Send response
+        return res.status(200).json({
+            message: "Cash payment marked as received",
+            order: {
+                id: Number(id),
+                payment_mode: "CASH",
+                payment_status: "PAID"
+            }
+        });
+
+    } catch (error) {
+
+        console.error("Update payment status error:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+};
+
 module.exports = {
-    createOrder,getMyOrders,getAllOrders,updateOrderStatus
+    createOrder,getMyOrders,getAllOrders,updateOrderStatus,updatePaymentStatus
 };
