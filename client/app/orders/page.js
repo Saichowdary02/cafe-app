@@ -820,7 +820,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Dashboard Stats Overview Cards */}
-                <div className={`mb-8 ${isStaffOrAdmin ? "grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4" : "max-w-xs"}`}>
+                <div className={`mb-8 ${isStaffOrAdmin ? "grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4" : "flex items-stretch justify-between gap-6"}`}>
                     {/* Total Orders Card */}
                     <div
                         onClick={() => setStatusFilter("ALL")}
@@ -844,6 +844,29 @@ export default function OrdersPage() {
                             <span className="text-xs font-medium text-stone-400">placed</span>
                         </div>
                     </div>
+
+                    {/* Order flow note — USER only, right side beside Total Orders */}
+                    {!isStaffOrAdmin && (
+                        <div className="ml-auto w-full max-w-xl rounded-2xl border border-orange-200/60 bg-orange-50/50 px-5 py-4">
+                            <p className="flex items-center gap-1.5 text-xs font-bold tracking-wide uppercase text-orange-700">
+                                🚚 How Order Status Works
+                            </p>
+                            <ul className="mt-2 space-y-1.5 text-[11px] leading-snug font-medium text-stone-500">
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-orange-500">•</span>
+                                    <span>
+                                        Orders start as <span className="font-bold text-stone-700">Pending</span> → after payment verification & staff acceptance they move <span className="font-bold text-stone-700">In Kitchen</span> → once delivered they're <span className="font-bold text-stone-700">Completed</span>.
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-orange-500">•</span>
+                                    <span>
+                                        Track the live status on each order card below. If a status hasn't updated, press the <span className="font-bold text-orange-600">Refresh</span> button in the upper right.
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                    )}
 
                     {/* Admin/Staff Only Metrics (Pending, In Kitchen, Completed) */}
                     {isStaffOrAdmin && (
@@ -987,7 +1010,7 @@ export default function OrdersPage() {
                     {/* Search & Sort Controls */}
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         {/* Search Input */}
-                        <div className="relative min-w-[200px] flex-1 sm:w-64 sm:flex-initial">
+                        <div className="relative min-w-50 flex-1 sm:w-64 sm:flex-initial">
                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                                 <svg
                                     className="h-3.5 w-3.5 text-stone-400"
@@ -1156,10 +1179,10 @@ export default function OrdersPage() {
                                     {/* Top Glow Accent */}
                                     <div
                                         className={`absolute top-0 left-0 right-0 h-1.5 ${order.status === "PENDING"
-                                                ? "bg-gradient-to-r from-amber-400 to-orange-400"
+                                                ? "bg-linear-to-r from-amber-400 to-orange-400"
                                                 : order.status === "PREPARING"
-                                                    ? "bg-gradient-to-r from-blue-400 to-indigo-500"
-                                                    : "bg-gradient-to-r from-emerald-400 to-teal-500"
+                                                    ? "bg-linear-to-r from-blue-400 to-indigo-500"
+                                                    : "bg-linear-to-r from-emerald-400 to-teal-500"
                                             }`}
                                     />
 
@@ -1167,7 +1190,7 @@ export default function OrdersPage() {
                                         {/* Card Header: Token # & Status */}
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50 font-black text-sm text-orange-600 shadow-2xs">
+                                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-orange-200/80 bg-linear-to-br from-orange-50 to-amber-50 font-black text-sm text-orange-600 shadow-2xs">
                                                     #{order.id}
                                                 </div>
                                                 <div>
@@ -1202,6 +1225,18 @@ export default function OrdersPage() {
                                                 status={order.payment_status || "PENDING"}
                                             />
                                         </div>
+
+                                        {/* Cash payment note — USER only, unpaid cash orders */}
+                                        {!isStaffOrAdmin &&
+                                            (order.payment_mode || "CASH") === "CASH" &&
+                                            (order.payment_status || "PENDING") !== "PAID" && (
+                                                <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-orange-200/70 bg-orange-50/70 px-3 py-2 text-[11px] font-medium text-orange-700">
+                                                    <span>💵</span>
+                                                    <span>
+                                                        Cash payment pending — our staff/admin will verify it on handover and your status will be updated to PAID.
+                                                    </span>
+                                                </p>
+                                            )}
 
                                         {/* Customer info — STAFF / ADMIN only */}
                                         {isStaffOrAdmin && (
@@ -1245,7 +1280,7 @@ export default function OrdersPage() {
                                                             className="flex items-center justify-between gap-2 py-1 text-xs text-stone-700 border-b border-stone-100/50 last:border-0"
                                                         >
                                                             <div className="flex items-center gap-2 min-w-0">
-                                                                <span className="flex h-5 min-w-[22px] items-center justify-center rounded-md border border-orange-200/80 bg-white px-1 text-[11px] font-black text-orange-600 shadow-2xs">
+                                                                <span className="flex h-5 min-w-5.5 items-center justify-center rounded-md border border-orange-200/80 bg-white px-1 text-[11px] font-black text-orange-600 shadow-2xs">
                                                                     {item.quantity}×
                                                                 </span>
                                                                 <span className="truncate font-semibold text-stone-800">
@@ -1322,7 +1357,7 @@ export default function OrdersPage() {
                                                         <button
                                                             onClick={() => markCashReceived(order.id)}
                                                             disabled={updatingId === order.id}
-                                                            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:to-teal-700 hover:shadow-md hover:shadow-emerald-500/30 active:scale-95 disabled:opacity-50"
+                                                            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:to-teal-700 hover:shadow-md hover:shadow-emerald-500/30 active:scale-95 disabled:opacity-50"
                                                         >
                                                             {updatingId === order.id ? (
                                                                 <span className="flex items-center gap-2">
@@ -1343,11 +1378,15 @@ export default function OrdersPage() {
                                                         </button>
                                                     )}
 
-                                                {order.status === "PENDING" && (
+                                                {/* Accept & Start Preparing — only after payment is successful.
+                                                    Online orders become PAID automatically via Razorpay verification;
+                                                    cash orders must first be marked "Cash Received" above. */}
+                                                {order.status === "PENDING" &&
+                                                    (order.payment_status || "PENDING") === "PAID" && (
                                                     <button
                                                         onClick={() => updateStatus(order.id, "PREPARING")}
                                                         disabled={updatingId === order.id}
-                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-orange-700 hover:to-amber-700 hover:shadow-md hover:shadow-orange-500/30 active:scale-95 disabled:opacity-50"
+                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-orange-700 hover:to-amber-700 hover:shadow-md hover:shadow-orange-500/30 active:scale-95 disabled:opacity-50"
                                                     >
                                                         {updatingId === order.id ? (
                                                             <span className="flex items-center gap-2">
@@ -1368,11 +1407,21 @@ export default function OrdersPage() {
                                                     </button>
                                                 )}
 
+                                                {order.status === "PENDING" &&
+                                                    (order.payment_status || "PENDING") !== "PAID" && (
+                                                        <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 py-2 text-xs font-bold text-amber-800">
+                                                            <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                                                            </svg>
+                                                            <span>Waiting for payment to be successful</span>
+                                                        </div>
+                                                    )}
+
                                                 {order.status === "PREPARING" && (
                                                     <button
                                                         onClick={() => updateStatus(order.id, "COMPLETED")}
                                                         disabled={updatingId === order.id}
-                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-md hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50"
+                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-md hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50"
                                                     >
                                                         {updatingId === order.id ? (
                                                             <span className="flex items-center gap-2">
@@ -1478,7 +1527,7 @@ export default function OrdersPage() {
                                 </div>
                                 {receiptOrder.items?.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-stone-800">
-                                        <span className="truncate max-w-[130px] font-medium">
+                                        <span className="truncate max-w-32.5 font-medium">
                                             {item.product_name || item.name}
                                         </span>
                                         <span className="text-stone-500 font-mono">

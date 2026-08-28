@@ -13,6 +13,7 @@ export default function ManageBillingPage() {
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState(null);
     const [testSubtotal, setTestSubtotal] = useState(200);
+    const [savedSettings, setSavedSettings] = useState(null);
 
     // Fetch current bill settings from server
     const fetchSettings = async () => {
@@ -27,13 +28,15 @@ export default function ManageBillingPage() {
 
             const data = await response.json();
             if (data.settings) {
-                setBillingSettings({
+                const normalized = {
                     packaging_fee_percent: Number(data.settings.packaging_fee_percent),
                     platform_fee: Number(data.settings.platform_fee),
                     cgst_percent: Number(data.settings.cgst_percent),
                     sgst_percent: Number(data.settings.sgst_percent),
                     platform_fee_gst_percent: Number(data.settings.platform_fee_gst_percent),
-                });
+                };
+                setBillingSettings(normalized);
+                setSavedSettings(normalized);
             }
         } catch (err) {
             console.error(err);
@@ -86,13 +89,15 @@ export default function ManageBillingPage() {
             });
 
             if (data.settings) {
-                setBillingSettings({
+                const normalized = {
                     packaging_fee_percent: Number(data.settings.packaging_fee_percent),
                     platform_fee: Number(data.settings.platform_fee),
                     cgst_percent: Number(data.settings.cgst_percent),
                     sgst_percent: Number(data.settings.sgst_percent),
                     platform_fee_gst_percent: Number(data.settings.platform_fee_gst_percent),
-                });
+                };
+                setBillingSettings(normalized);
+                setSavedSettings(normalized);
             }
         } catch (err) {
             console.error(err);
@@ -105,8 +110,16 @@ export default function ManageBillingPage() {
         }
     };
 
+    // Detect unsaved changes
+    const hasChanges =
+        savedSettings !== null &&
+        ["packaging_fee_percent", "platform_fee", "cgst_percent", "sgst_percent", "platform_fee_gst_percent"].some(
+            (key) => Number(billingSettings[key]) !== savedSettings[key]
+        );
+
     // Live preview calculations based on current inputs
     const testBreakdown = calculateBillBreakdown(testSubtotal, billingSettings);
+    const totalTaxPct = Number(billingSettings.cgst_percent || 0) + Number(billingSettings.sgst_percent || 0);
 
     return (
         <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -123,35 +136,50 @@ export default function ManageBillingPage() {
                 )}
 
                 <main className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
-                    {/* Header */}
-                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
-                                <span>🔒 Admin Only</span>
-                            </div>
-                            <h1 className="mt-2 text-3xl font-extrabold text-stone-900 sm:text-4xl">
-                                Bill & Tax Settings
-                            </h1>
-                            <p className="mt-1.5 text-sm text-stone-600">
-                                Configure packaging fee, platform fee, CGST, SGST, and Platform Fee GST. Customer cart and checkout automatically calculate using these active parameters.
-                            </p>
-                        </div>
+                    {/* Header Hero */}
+                    <div className="relative mb-8 overflow-hidden rounded-3xl bg-linear-to-br from-stone-900 via-stone-800 to-orange-950 p-6 shadow-2xl shadow-amber-950/20 sm:p-8">
+                        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-500/20 blur-3xl" aria-hidden="true" />
+                        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" aria-hidden="true" />
 
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={fetchSettings}
-                                disabled={loading}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-xs font-bold text-stone-700 shadow-2xs transition hover:bg-stone-50 active:scale-95 disabled:opacity-50"
-                            >
-                                {loading ? "Refreshing..." : "↻ Refresh"}
-                            </button>
-                            <Link
-                                href="/manage-products"
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-xs font-bold text-stone-700 shadow-2xs transition hover:bg-stone-50 active:scale-95"
-                            >
-                                <span>Manage Products →</span>
-                            </Link>
+                        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-orange-500 to-amber-500 text-2xl shadow-lg shadow-orange-900/40">
+                                    🧾
+                                </div>
+                                <div>
+                                    <div className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/30 bg-orange-500/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-orange-300">
+                                        <span className="relative flex h-1.5 w-1.5">
+                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-400" />
+                                        </span>
+                                        Admin Only
+                                    </div>
+                                    <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                                        Bill &amp; Tax Settings
+                                    </h1>
+                                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-stone-400">
+                                        Configure packaging fee, platform fee, CGST, SGST and Platform Fee GST. The customer cart &amp; checkout apply these parameters automatically.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={fetchSettings}
+                                    disabled={loading}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-bold text-stone-100 backdrop-blur transition hover:bg-white/20 active:scale-95 disabled:opacity-50"
+                                >
+                                    <span className={loading ? "inline-block animate-spin" : ""}>↻</span>
+                                    {loading ? "Refreshing" : "Refresh"}
+                                </button>
+                                <Link
+                                    href="/manage-products"
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-stone-900 shadow transition hover:bg-orange-50 active:scale-95"
+                                >
+                                    Manage Products <span aria-hidden="true">→</span>
+                                </Link>
+                            </div>
                         </div>
                     </div>
 
@@ -159,9 +187,18 @@ export default function ManageBillingPage() {
                         {/* Settings Form */}
                         <div className="lg:col-span-6 space-y-6">
                             <form onSubmit={handleSave} className="rounded-3xl border border-stone-200/80 bg-white/95 p-6 shadow-xl shadow-amber-950/5 backdrop-blur-md sm:p-7">
-                                <h2 className="text-lg font-bold text-stone-900 border-b border-stone-100 pb-3">
-                                    Fee & GST Parameters
-                                </h2>
+                                <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                                    <h2 className="flex items-center gap-2 text-lg font-bold text-stone-900">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-base">⚙️</span>
+                                        Fee &amp; GST Parameters
+                                    </h2>
+                                    {hasChanges && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                            Unsaved changes
+                                        </span>
+                                    )}
+                                </div>
 
                                 <div className="mt-5 space-y-4">
                                     {/* Packaging Fee (%) */}
@@ -187,7 +224,7 @@ export default function ManageBillingPage() {
                                                 className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm font-bold text-stone-900 shadow-inner focus:border-orange-500 focus:outline-hidden"
                                                 required
                                             />
-                                            <span className="font-extrabold text-stone-500">%</span>
+                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-sm font-extrabold text-stone-500" aria-hidden="true">%</span>
                                         </div>
                                     </div>
 
@@ -200,7 +237,7 @@ export default function ManageBillingPage() {
                                             Fixed app convenience charge per order (e.g. ₹5.00)
                                         </p>
                                         <div className="mt-2.5 flex items-center gap-2">
-                                            <span className="font-extrabold text-stone-500">₹</span>
+                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-sm font-extrabold text-stone-500" aria-hidden="true">₹</span>
                                             <input
                                                 type="number"
                                                 step="0.5"
@@ -243,7 +280,7 @@ export default function ManageBillingPage() {
                                                     className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-bold text-stone-900 shadow-inner focus:border-orange-500 focus:outline-hidden"
                                                     required
                                                 />
-                                                <span className="font-extrabold text-stone-500">%</span>
+                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-sm font-extrabold text-stone-500" aria-hidden="true">%</span>
                                             </div>
                                         </div>
 
@@ -270,7 +307,7 @@ export default function ManageBillingPage() {
                                                     className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-bold text-stone-900 shadow-inner focus:border-orange-500 focus:outline-hidden"
                                                     required
                                                 />
-                                                <span className="font-extrabold text-stone-500">%</span>
+                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-sm font-extrabold text-stone-500" aria-hidden="true">%</span>
                                             </div>
                                         </div>
                                     </div>
@@ -298,7 +335,7 @@ export default function ManageBillingPage() {
                                                 className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm font-bold text-stone-900 shadow-inner focus:border-orange-500 focus:outline-hidden"
                                                 required
                                             />
-                                            <span className="font-extrabold text-stone-500">%</span>
+                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-sm font-extrabold text-stone-500" aria-hidden="true">%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -307,17 +344,27 @@ export default function ManageBillingPage() {
                                     <button
                                         type="submit"
                                         disabled={saving}
-                                        className="flex-1 cursor-pointer rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-orange-600/35 active:scale-95 disabled:opacity-50"
+                                        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-orange-600 to-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-orange-600/35 active:scale-95 disabled:opacity-50"
                                     >
+                                        <span aria-hidden="true">{saving ? "⏳" : "💾"}</span>
                                         {saving ? "Saving..." : "Save Bill Settings"}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setBillingSettings(DEFAULT_BILL_SETTINGS)}
-                                        className="cursor-pointer rounded-2xl border border-stone-300 bg-white px-4 py-3.5 text-xs font-bold text-stone-700 hover:bg-stone-50 active:scale-95"
+                                        className="cursor-pointer rounded-2xl border border-stone-300 bg-white px-5 py-3.5 text-xs font-bold text-stone-700 transition hover:border-stone-400 hover:bg-stone-50 active:scale-95"
                                     >
-                                        Reset Defaults
+                                        ↺ Reset Defaults
                                     </button>
+                                    {hasChanges && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setBillingSettings(savedSettings)}
+                                            className="cursor-pointer rounded-2xl border border-stone-300 bg-white px-5 py-3.5 text-xs font-bold text-stone-700 transition hover:border-stone-400 hover:bg-stone-50 active:scale-95"
+                                        >
+                                            Discard Changes
+                                        </button>
+                                    )}
                                 </div>
                             </form>
                         </div>
@@ -325,23 +372,43 @@ export default function ManageBillingPage() {
                         {/* Live Calculation Table Preview */}
                         <div className="lg:col-span-6 space-y-6">
                             <div className="rounded-3xl border border-stone-200/80 bg-white/95 p-6 shadow-xl shadow-amber-950/5 backdrop-blur-md sm:p-7">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-4">
+                                <div className="flex flex-col gap-4 border-b border-stone-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <h3 className="text-lg font-bold text-stone-900">
+                                        <h3 className="flex items-center gap-2 text-lg font-bold text-stone-900">
+                                            <span className="relative flex h-2.5 w-2.5">
+                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                            </span>
                                             Live Formula Simulator
                                         </h3>
-                                        <p className="text-xs text-stone-500">
+                                        <p className="mt-1 text-xs text-stone-500">
                                             Real-time bill breakdown calculated with your settings.
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-stone-600">Sample Subtotal: ₹</span>
+                                    <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+                                        <span className="text-xs font-bold text-stone-600">Sample Subtotal ₹</span>
                                         <input
                                             type="number"
                                             value={testSubtotal}
                                             onChange={(e) => setTestSubtotal(Math.max(0, Number(e.target.value) || 0))}
-                                            className="w-24 rounded-xl border border-stone-300 px-3 py-1 text-xs font-bold text-stone-900 text-right focus:border-orange-500"
+                                            className="w-20 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-right text-xs font-bold text-stone-900 focus:border-orange-500 focus:outline-hidden"
                                         />
+                                    </div>
+                                </div>
+
+                                {/* Quick Summary Chips */}
+                                <div className="mt-4 grid grid-cols-3 gap-2.5">
+                                    <div className="rounded-2xl border border-stone-200/80 bg-stone-50/70 p-3 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Subtotal</p>
+                                        <p className="mt-1 text-sm font-extrabold text-stone-900 sm:text-base">₹{testBreakdown.subtotal.toFixed(2)}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-stone-200/80 bg-stone-50/70 p-3 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Fees &amp; Taxes ({totalTaxPct}% GST)</p>
+                                        <p className="mt-1 text-sm font-extrabold text-stone-900 sm:text-base">₹{(testBreakdown.packaging_fee + testBreakdown.platform_fee + testBreakdown.cgst + testBreakdown.sgst + testBreakdown.platform_fee_gst).toFixed(2)}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-3 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600">Grand Total</p>
+                                        <p className="mt-1 text-sm font-extrabold text-orange-600 sm:text-base">₹{testBreakdown.grand_total.toFixed(2)}</p>
                                     </div>
                                 </div>
 
@@ -408,11 +475,11 @@ export default function ManageBillingPage() {
                                                     {testBreakdown.rounding_off >= 0 ? `+₹${testBreakdown.rounding_off.toFixed(2)}` : `-₹${Math.abs(testBreakdown.rounding_off).toFixed(2)}`}
                                                 </td>
                                             </tr>
-                                            <tr className="border-t-2 border-orange-500/80 bg-orange-50/60 font-black text-orange-950">
-                                                <td className="py-3 text-base">Grand Total (Payable)</td>
-                                                <td className="py-3 text-xs font-semibold text-stone-600">Final bill</td>
-                                                <td className="py-3 text-xs font-semibold text-stone-600">{testBreakdown.calculated_total.toFixed(2)} + {testBreakdown.rounding_off.toFixed(2)}</td>
-                                                <td className="py-3 text-right text-lg text-orange-600">₹{testBreakdown.grand_total.toFixed(2)}</td>
+                                            <tr className="border-t-2 border-orange-500 bg-linear-to-r from-orange-50 to-amber-50 font-black text-orange-950">
+                                                <td className="rounded-bl-xl py-3.5 text-sm sm:text-base">Grand Total (Payable)</td>
+                                                <td className="py-3.5 text-xs font-semibold text-stone-600">Final bill</td>
+                                                <td className="py-3.5 text-xs font-semibold text-stone-600">{testBreakdown.calculated_total.toFixed(2)} + {testBreakdown.rounding_off.toFixed(2)}</td>
+                                                <td className="rounded-br-xl py-3.5 text-right text-lg text-orange-600 sm:text-xl">₹{testBreakdown.grand_total.toFixed(2)}</td>
                                             </tr>
                                         </tbody>
                                     </table>

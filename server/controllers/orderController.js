@@ -292,7 +292,7 @@ const updateOrderStatus = async (req, res) => {
 
         // 5. Find the order
         const [orders] = await pool.execute(
-            `SELECT id, status
+            `SELECT id, status, payment_status
              FROM orders
              WHERE id = ?`,
             [id]
@@ -315,6 +315,18 @@ const updateOrderStatus = async (req, res) => {
         ) {
             return res.status(400).json({
                 message: "Pending order can only be moved to PREPARING"
+            });
+        }
+
+        // Payment must be successful before accepting/preparing an order.
+        // Online payments become PAID automatically via Razorpay verification;
+        // cash payments must be confirmed by staff first.
+        if (
+            order.status === "PENDING" &&
+            (order.payment_status || "PENDING") !== "PAID"
+        ) {
+            return res.status(400).json({
+                message: "Payment must be successful before accepting the order"
             });
         }
 

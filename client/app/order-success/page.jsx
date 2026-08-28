@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -10,7 +10,79 @@ function OrderSuccessContent() {
 
     const orderId = searchParams.get("orderId");
 
-    const isPaid = searchParams.get("paid") === "1";
+    const [order, setOrder] = useState(null);
+    const [fetchFailed, setFetchFailed] = useState(false);
+
+    useEffect(() => {
+
+        const fetchOrder = async () => {
+
+            try {
+
+                const token = localStorage.getItem("token");
+
+                const response = await fetch(
+                    "http://localhost:5000/api/orders/my-orders",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    setFetchFailed(true);
+                    return;
+                }
+
+                const data = await response.json();
+
+                const matched = (data.orders || []).find(
+                    (o) => String(o.id) === String(orderId)
+                );
+
+                if (matched) {
+                    setOrder(matched);
+                } else {
+                    setFetchFailed(true);
+                }
+
+            } catch (error) {
+                console.error(error);
+                setFetchFailed(true);
+            }
+        };
+
+        if (orderId) {
+            fetchOrder();
+        }
+
+    }, [orderId]);
+
+    const paymentMode = order?.payment_mode
+        || (searchParams.get("paid") === "1" ? "ONLINE" : "CASH");
+
+    const paymentStatus = order?.payment_status
+        || (searchParams.get("paid") === "1" ? "PAID" : "PENDING");
+
+    const isPaid = paymentStatus === "PAID";
+    const isFailed = paymentStatus === "FAILED";
+
+    const statusColor = isPaid
+        ? "text-green-600"
+        : isFailed
+            ? "text-red-600"
+            : "text-orange-600";
+
+    const statusLabel = isFailed
+        ? "FAILED"
+        : isPaid
+            ? `PAID (${paymentMode === "ONLINE" ? "Online" : "Cash"})`
+            : `PENDING (${paymentMode === "ONLINE" ? "Online" : "Cash"})`;
+
+    const helperText = paymentMode === "CASH" && !isPaid
+        ? "Your cash payment is pending. It will be marked as PAID once verified by our staff/admin."
+        : null;
 
 
     return (
@@ -58,22 +130,40 @@ function OrderSuccessContent() {
                     <div className="mt-4 flex justify-between">
 
                         <span className="text-gray-600">
-                            Status
+                            Payment Mode
                         </span>
 
-                        {isPaid ? (
-                            <span className="font-semibold text-green-600">
-                                PAID (Online)
-                            </span>
-                        ) : (
-                            <span className="font-semibold text-orange-600">
-                                PENDING
-                            </span>
-                        )}
+                        <span className="font-semibold text-gray-900">
+                            {paymentMode === "ONLINE"
+                                ? "Online (UPI / Razorpay)"
+                                : "Cash"}
+                        </span>
+
+                    </div>
+
+
+                    <div className="mt-4 flex justify-between">
+
+                        <span className="text-gray-600">
+                            Payment Status
+                        </span>
+
+                        <span className={`font-semibold ${statusColor}`}>
+                            {order || fetchFailed ? statusLabel : "Checking..."}
+                        </span>
 
                     </div>
 
                 </div>
+
+
+                {/* Cash payment helper note */}
+
+                {helperText && (
+                    <p className="mt-4 rounded-xl border border-orange-200/80 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                        💵 {helperText}
+                    </p>
+                )}
 
 
                 {/* Buttons */}

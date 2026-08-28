@@ -167,52 +167,51 @@ export default function StaffPage() {
                 />
             )}
 
-            <main className="min-h-screen bg-gradient-to-br from-stone-50 via-orange-50/30 to-amber-50/20 px-4 py-8">
+            <main className="min-h-screen bg-linear-to-br from-stone-50 via-orange-50/30 to-amber-50/20 px-4 py-8">
                 <div className="mx-auto max-w-6xl">
 
-                    {/* Page Header */}
-                    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600 text-white shadow-md shadow-orange-500/30">
-                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    {/* Page Header — hero card */}
+                    <div className="relative mb-6 overflow-hidden rounded-3xl border border-amber-900/10 bg-white/95 p-6 shadow-sm backdrop-blur-sm sm:p-7">
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-amber-400 via-orange-400 to-rose-400" />
+                        <div
+                            className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-orange-100/70 blur-3xl"
+                            aria-hidden="true"
+                        />
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3.5">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200/80 bg-linear-to-br from-orange-50 to-amber-50 text-stone-800 shadow-2xs">
+                                    <svg className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-black text-gray-900">Staff Management</h1>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">
+                                        Admin · Team
+                                    </p>
+                                    <h1 className="text-2xl font-black tracking-tight text-gray-900">Staff Management</h1>
                                     <p className="text-sm text-stone-500 font-medium">Manage your cafe staff members</p>
                                 </div>
                             </div>
-                        </div>
 
-                        <button
-                            id="add-staff-btn"
-                            onClick={() => setShowAddModal(true)}
-                            className="flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/30 transition-all hover:bg-orange-700 active:scale-95"
-                        >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Add Staff Member
-                        </button>
-                    </div>
+                            <div className="flex items-center gap-3">
+                                {/* Total staff stat chip */}
+                                <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-2.5">
+                                    <p className="text-2xl font-black leading-none text-orange-600">{staff.length}</p>
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 leading-tight">
+                                        Total<br />Staff
+                                    </p>
+                                </div>
 
-                    {/* Stats Card */}
-                    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
-                            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Total Staff</p>
-                            <p className="mt-1 text-3xl font-black text-orange-600">{staff.length}</p>
-                        </div>
-                        <div className="rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
-                            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Role</p>
-                            <p className="mt-1 text-3xl font-black text-stone-700">STAFF</p>
-                        </div>
-                        <div className="rounded-2xl border border-stone-100 bg-white p-5 shadow-sm">
-                            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Status</p>
-                            <div className="mt-2 flex items-center gap-2">
-                                <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse"></span>
-                                <span className="text-sm font-bold text-green-700">Active</span>
+                                <button
+                                    id="add-staff-btn"
+                                    onClick={() => setShowAddModal(true)}
+                                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/30 transition-all hover:-translate-y-0.5 hover:from-orange-700 hover:to-amber-700 hover:shadow-lg hover:shadow-orange-500/35 active:scale-95"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Add Staff Member
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -249,7 +248,7 @@ export default function StaffPage() {
                     </div>
 
                     {/* Staff Table */}
-                    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                    <div className="overflow-hidden rounded-3xl border border-amber-900/10 bg-white shadow-sm">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-20 gap-3">
                                 <div className="h-10 w-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-600"></div>
@@ -295,7 +294,7 @@ export default function StaffPage() {
 
                                             {/* Name with Avatar */}
                                             <div className="col-span-3 flex items-center gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-400 text-sm font-black text-white shadow-sm">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-tr from-orange-500 to-amber-400 text-sm font-black text-white shadow-sm">
                                                     {member.name.charAt(0).toUpperCase()}
                                                 </div>
                                                 <span className="truncate text-sm font-bold text-stone-800">{member.name}</span>
@@ -306,7 +305,8 @@ export default function StaffPage() {
 
                                             {/* Role Badge */}
                                             <span className="col-span-2">
-                                                <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-amber-800">
+                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-amber-800">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                                                     {member.role}
                                                 </span>
                                             </span>
@@ -334,8 +334,13 @@ export default function StaffPage() {
                                 </div>
 
                                 {/* Table Footer */}
-                                <div className="border-t border-stone-100 bg-stone-50 px-6 py-3 text-xs font-medium text-stone-400">
-                                    Showing {staff.length} staff member{staff.length !== 1 ? "s" : ""}
+                                <div className="border-t border-stone-100 bg-stone-50 px-6 py-3">
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-400">
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Showing {staff.length} staff member{staff.length !== 1 ? "s" : ""}
+                                    </span>
                                 </div>
                             </>
                         )}

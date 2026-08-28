@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Toast from "@/components/Toast";
+import AuthHeader from "@/components/AuthHeader";
 
 export default function RegisterPage() {
 
@@ -12,6 +13,9 @@ export default function RegisterPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [toast, setToast] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -26,6 +30,17 @@ export default function RegisterPage() {
     const handleRegister = async (e) => {
 
         e.preventDefault();
+
+        if (password !== confirmPassword) {
+            showToast("Passwords do not match", "error");
+            return;
+        }
+
+        if (password.length < 6) {
+            showToast("Password must be at least 6 characters", "error");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -69,7 +84,7 @@ export default function RegisterPage() {
 
     return (
 
-        <main className="relative flex min-h-screen items-center justify-center px-4">
+        <main className="relative flex min-h-screen items-center justify-center px-4 pb-6 pt-24">
 
             {/* Toast Notification */}
             {toast && (
@@ -80,16 +95,17 @@ export default function RegisterPage() {
                 />
             )}
 
-            {/* Top-left Brand Logo & Name */}
-            <div className="absolute top-6 left-6">
-                <Link
-                    href="/login"
-                    className="flex items-center gap-2.5 text-gray-900 group"
-                >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600 text-white shadow-md shadow-orange-500/20 group-hover:bg-orange-700 transition">
+            {/* Top Navbar */}
+            <AuthHeader />
+
+            <div className="w-full max-w-md rounded-3xl border border-stone-200/80 bg-white/95 p-6 shadow-xl shadow-amber-900/5 backdrop-blur-sm sm:p-8">
+
+                {/* Centered Logo Badge — same as navbar logo */}
+                <div className="mb-3 flex justify-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-600 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-100">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 w-6"
+                            className="h-7 w-7"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -107,34 +123,30 @@ export default function RegisterPage() {
                             />
                         </svg>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-gray-900">
-                        Cafe App
-                    </span>
-                </Link>
-            </div>
+                </div>
 
-            <div className="w-full max-w-md rounded-2xl border border-stone-200/80 bg-white/95 p-8 shadow-xl shadow-amber-900/5 backdrop-blur-sm">
-
-                <h1 className="mb-2 text-3xl font-bold">
-                    Create Account
-                </h1>
-
-                <p className="mb-6 text-gray-600">
-                    Create your Cafe App account
-                </p>
+                {/* Centered Heading */}
+                <div className="mb-5 text-center">
+                    <h1 className="text-2xl font-black tracking-tight text-gray-900">
+                        Create Account
+                    </h1>
+                    <p className="mt-1 text-sm text-stone-500">
+                        Join Cafe App to order fresh delights
+                    </p>
+                </div>
 
                 <form
                     onSubmit={handleRegister}
-                    className="space-y-5"
+                    className="space-y-3.5"
                 >
 
                     {/* Name */}
                     <div>
                         <label
                             htmlFor="name"
-                            className="mb-2 block font-medium text-stone-700"
+                            className="mb-1.5 block text-sm font-semibold text-stone-700"
                         >
-                            Name
+                            Full Name
                         </label>
                         <input
                             id="name"
@@ -143,9 +155,9 @@ export default function RegisterPage() {
                             onChange={(e) =>
                                 setName(e.target.value)
                             }
-                            placeholder="Enter your name"
+                            placeholder="Enter your full name"
                             required
-                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                            className="w-full rounded-xl border border-stone-200 px-4 py-2 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         />
                     </div>
 
@@ -153,9 +165,9 @@ export default function RegisterPage() {
                     <div>
                         <label
                             htmlFor="email"
-                            className="mb-2 block font-medium text-stone-700"
+                            className="mb-1.5 block text-sm font-semibold text-stone-700"
                         >
-                            Email
+                            Email Address
                         </label>
                         <input
                             id="email"
@@ -166,7 +178,7 @@ export default function RegisterPage() {
                             }
                             placeholder="Enter your email"
                             required
-                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                            className="w-full rounded-xl border border-stone-200 px-4 py-2 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                         />
                     </div>
 
@@ -174,28 +186,90 @@ export default function RegisterPage() {
                     <div>
                         <label
                             htmlFor="password"
-                            className="mb-2 block font-medium text-stone-700"
+                            className="mb-1.5 block text-sm font-semibold text-stone-700"
                         >
                             Password
                         </label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) =>
-                                setPassword(e.target.value)
-                            }
-                            placeholder="Enter your password"
-                            required
-                            className="w-full rounded-xl border border-stone-200 px-4 py-2.5 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
-                        />
+                        <div className="relative">
+                            <input
+                                id="password"
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) =>
+                                    setPassword(e.target.value)
+                                }
+                                placeholder="Create a password"
+                                required
+                                minLength={6}
+                                className="w-full rounded-xl border border-stone-200 px-4 py-2 pr-11 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((s) => !s)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                title={showPassword ? "Hide password" : "Show password"}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg p-1.5 text-stone-400 transition hover:bg-orange-50 hover:text-orange-600"
+                            >
+                                {showPassword ? (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M10.585 10.587a2 2 0 002.828 2.828M9.878 5.11A9.955 9.955 0 0112 4.86c4.6 0 8.56 2.85 10.14 6.86a10.03 10.03 0 01-2.31 3.52m-3.06 1.68a9.96 9.96 0 01-4.77 1.22c-4.6 0-8.56-2.85-10.14-6.86a10.04 10.04 0 013.44-4.44" />
+                                    </svg>
+                                ) : (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 8-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                        <label
+                            htmlFor="confirmPassword"
+                            className="mb-1.5 block text-sm font-semibold text-stone-700"
+                        >
+                            Confirm Password
+                        </label>
+                        <div className="relative">
+                            <input
+                                id="confirmPassword"
+                                type={showConfirmPassword ? "text" : "password"}
+                                value={confirmPassword}
+                                onChange={(e) =>
+                                    setConfirmPassword(e.target.value)
+                                }
+                                placeholder="Confirm your password"
+                                required
+                                className="w-full rounded-xl border border-stone-200 px-4 py-2 pr-11 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword((s) => !s)}
+                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                title={showConfirmPassword ? "Hide password" : "Show password"}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg p-1.5 text-stone-400 transition hover:bg-orange-50 hover:text-orange-600"
+                            >
+                                {showConfirmPassword ? (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M10.585 10.587a2 2 0 002.828 2.828M9.878 5.11A9.955 9.955 0 0112 4.86c4.6 0 8.56 2.85 10.14 6.86a10.03 10.03 0 01-2.31 3.52m-3.06 1.68a9.96 9.96 0 01-4.77 1.22c-4.6 0-8.56-2.85-10.14-6.86a10.04 10.04 0 013.44-4.44" />
+                                    </svg>
+                                ) : (
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 8-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Button */}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full cursor-pointer rounded-xl bg-orange-600 py-3 font-semibold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.99] disabled:opacity-50"
+                        className="w-full cursor-pointer rounded-xl bg-orange-600 py-2.5 font-semibold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.99] disabled:opacity-50"
                     >
                         {loading
                             ? "Creating Account..."
@@ -205,15 +279,27 @@ export default function RegisterPage() {
 
                 </form>
 
-                <p className="mt-6 text-center text-sm text-gray-600">
+                <p className="mt-4 text-center text-sm text-gray-600">
                     Already have an account?
                     <button
                         onClick={() => router.push("/login")}
                         className="ml-1 cursor-pointer font-semibold text-orange-600 hover:text-orange-700"
                     >
-                        Login
+                        Sign in here
                     </button>
                 </p>
+
+                {/* Tips Panel */}
+                <div className="mt-4 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4">
+                    <p className="text-sm font-bold text-stone-800">
+                        💡 Tips:
+                    </p>
+                    <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-stone-600">
+                        <li>• Use a strong password with at least 6 characters</li>
+                        <li>• Enter your real name for a personalized experience</li>
+                        <li>• Use a valid email for order updates</li>
+                    </ul>
+                </div>
 
             </div>
 
