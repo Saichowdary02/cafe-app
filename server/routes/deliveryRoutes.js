@@ -6,7 +6,8 @@ const {
     getDeliveryOrders,
     assignDeliveryBoy,
     updateDeliveryStatus,
-    markCashReceived
+    markCashReceived,
+    updateMyLocation
 } = require("../controllers/deliveryController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -34,6 +35,14 @@ router.patch(
     authMiddleware,
     authorizeRoles("DELIVERY"),
     markCashReceived
+);
+
+// Delivery boy: push live GPS location while out for delivery
+router.post(
+    "/location",
+    authMiddleware,
+    authorizeRoles("DELIVERY"),
+    updateMyLocation
 );
 
 // Admin: assign a delivery boy to an order (kitchen can hand over ready orders too)

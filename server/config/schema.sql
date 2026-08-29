@@ -159,3 +159,20 @@ ALTER TABLE orders
         FOREIGN KEY (delivery_boy_id) REFERENCES users(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_boy ON orders(delivery_boy_id);
+
+-- ============================================================
+-- 8. Delivery Locations Table (live tracking)
+--    One row per delivery boy — "where is boy #7 right now?".
+--    The row is UPSERTED (never appended) by the delivery boy's
+--    app every ~10 sec while an order is OUT_FOR_DELIVERY.
+--    Customers poll GET /api/orders/:id/tracking which reads it.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS delivery_locations (
+    delivery_boy_id INT NOT NULL PRIMARY KEY,
+    latitude        DECIMAL(10,8) NOT NULL,
+    longitude       DECIMAL(11,8) NOT NULL,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_dlivery_loc_boy
+        FOREIGN KEY (delivery_boy_id) REFERENCES users(id) ON DELETE CASCADE
+);

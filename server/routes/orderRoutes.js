@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const {
-    createOrder,getMyOrders, getAllOrders,updateOrderStatus,updatePaymentStatus
+    createOrder,getMyOrders, getAllOrders,updateOrderStatus,updatePaymentStatus,getDeliveryTracking
 } = require("../controllers/orderController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -38,6 +38,13 @@ router.patch(
     authMiddleware,
     authorizeRoles("ADMIN"),
     updatePaymentStatus
+);
+
+// Customer tracks his own order's delivery (polls delivery boy's live location)
+router.get(
+    "/:id/tracking",
+    authMiddleware,
+    getDeliveryTracking
 );
 
 module.exports = router;

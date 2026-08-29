@@ -224,6 +224,7 @@ const getMyOrders = async (req, res) => {
                 delivery_address,
                 latitude,
                 longitude,
+                delivery_boy_id,
                 created_at
              FROM orders
              WHERE user_id = ?
@@ -573,6 +574,81 @@ const updatePaymentStatus = async (req, res) => {
     }
 };
 
+/*
+ * GET /api/orders/:id/tracking (any logged-in user, own orders only)
+ * Returns a tracking snapshot for the customer's "Track Delivery" view:
+ * the customer's delivery location and the assigned delivery boy's
+ * latest GPS location (from delivery_locations, if any).
+ * The backend returns raw coordinates only — the client asks OSRM
+ * for the driving route, consistent with routingService.js.
+ */
+const getDeliveryTracking = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Find the order
+        const [orders] = await pool.execute(
+            `SELECT id, user_id, status, delivery_boy_id, latitude, longitude, delivery_address
+             FROM orders
+             WHERE id = ?`,
+            [id]
+        );
+
+        if (orders.length === 0) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        const order = orders[0];
+
+        // 2. Customers can only track their own orders
+        if (order.user_id !== req.user.id) {
+            return res.status(403).json({
+                message: "You can only track your own orders"
+            });
+        }
+
+        // 3. Live location only exists while the order is out for delivery
+        let deliveryBoyLocation = null;
+        if (order.status === "OUT_FOR_DELIVERY" && order.delivery_boy_id) {
+            const [locations] = await pool.execute(
+                `SELECT latitude, longitude, updated_at
+                 FROM delivery_locations
+                 WHERE delivery_boy_id = ?`,
+                [order.delivery_boy_id]
+            );
+
+            if (locations.length > 0) {
+                deliveryBoyLocation = {
+                    latitude: Number(locations[0].latitude),
+                    longitude: Number(locations[0].longitude),
+                    updatedAt: locations[0].updated_at
+                };
+            }
+        }
+
+        // 4. Send the tracking snapshot
+        return res.status(200).json({
+            message: "Tracking data retrieved successfully",
+            tracking: {
+                orderId: order.id,
+                status: order.status,
+                deliveryBoyId: order.delivery_boy_id,
+                customerLocation:
+                    order.latitude != null
+                        ? {
+                              latitude: Number(order.latitude),
+                              longitude: Number(order.longitude)
+                          }
+                        : null,
+                deliveryBoyLocation
+            }
+        });
+    } catch (error) {
+        console.error("Get delivery tracking error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 module.exports = {
-    createOrder,getMyOrders,getAllOrders,updateOrderStatus,updatePaymentStatus
+    createOrder,getMyOrders,getAllOrders,updateOrderStatus,updatePaymentStatus,getDeliveryTracking
 };

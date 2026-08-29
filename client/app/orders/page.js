@@ -14,6 +14,13 @@ const DeliveryLocationMap = dynamic(
     () => import("@/components/maps/DeliveryLocationMap"),
     { ssr: false }
 );
+const OrderTrackingMap = dynamic(
+    () => import("@/components/maps/OrderTrackingMap"),
+    { ssr: false }
+);
+
+import { getTracking } from "@/services/trackingService";
+
 
 function StatusBadge({ status }) {
     const config = ORDER_STATUS_CONFIG[status];
@@ -231,6 +238,11 @@ export default function OrdersPage() {
     // Filters and Search state
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
+    // Live tracking state (customer "Track Delivery")
+    const [trackingOrderId, setTrackingOrderId] = useState(null); // order being tracked
+    const [trackingData, setTrackingData] = useState(null); // last tracking snapshot
+    const [trackingError, setTrackingError] = useState("");
+
     const [sortBy, setSortBy] = useState("NEWEST");
     const [receiptOrder, setReceiptOrder] = useState(null);
 
@@ -292,6 +304,49 @@ export default function OrdersPage() {
             })
             .catch((err) => console.error("Failed to fetch bill settings:", err));
     }, []);
+
+    // ── Live delivery tracking (customer polls every ~12s) ──
+    const fetchTracking = async (orderId) => {
+        try {
+            const token = localStorage.getItem("token");
+            const tracking = await getTracking(orderId, token);
+            setTrackingData(tracking);
+            setTrackingError("");
+
+            // Order finished (DELIVERED or otherwise moved on) — stop polling
+            if (tracking.status !== "OUT_FOR_DELIVERY") {
+                setOrders((current) =>
+                    current.map((o) =>
+                        o.id === orderId ? { ...o, status: tracking.status } : o
+                    )
+                );
+            }
+        } catch (err) {
+            setTrackingError(err.message || "Failed to fetch tracking data");
+        }
+    };
+
+    const toggleTracking = (orderId) => {
+        if (trackingOrderId === orderId) {
+            setTrackingOrderId(null);
+            setTrackingData(null);
+            setTrackingError("");
+            return;
+        }
+        setTrackingOrderId(orderId);
+        setTrackingData(null);
+        setTrackingError("");
+        fetchTracking(orderId);
+    };
+
+    // Polling loop — only while one order's tracking panel is open
+    useEffect(() => {
+        if (!trackingOrderId) return;
+        const interval = setInterval(() => fetchTracking(trackingOrderId), 12000);
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trackingOrderId]);
+
 
     const fetchOrders = async (token, role, isManualRefresh = false) => {
         try {
@@ -1346,6 +1401,47 @@ export default function OrdersPage() {
                                                             address={order.delivery_address}
                                                             height={220}
                                                         />
+                                                    </div>
+                                                )}
+                                                {/* Live delivery tracking — customer only, while out for delivery */}
+                                                {!isStaffOrAdmin &&
+                                                    order.status === "OUT_FOR_DELIVERY" &&
+                                                    order.latitude != null && (
+                                                    <div className="mt-2">
+                                                        <button
+                                                            onClick={() => toggleTracking(order.id)}
+                                                            className={`w-full cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition ${
+                                                                trackingOrderId === order.id
+                                                                    ? "bg-stone-500 hover:bg-stone-600"
+                                                                    : "bg-orange-600 hover:bg-orange-700"
+                                                            }`}
+                                                        >
+                                                            {trackingOrderId === order.id
+                                                                ? "Hide Tracking"
+                                                                : "🛵 Track Delivery"}
+                                                        </button>
+                                                        {trackingOrderId === order.id && (
+                                                            <div className="mt-2">
+                                                                {trackingError ? (
+                                                                    <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                                                                        {trackingError}
+                                                                    </p>
+                                                                ) : trackingData ? (
+                                                                    <OrderTrackingMap
+                                                                        customerLocation={
+                                                                            trackingData.customerLocation
+                                                                        }
+                                                                        deliveryBoyLocation={
+                                                                            trackingData.deliveryBoyLocation
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <p className="rounded-xl bg-stone-100 px-3 py-2 text-xs font-semibold text-stone-500">
+                                                                        Loading tracking...
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

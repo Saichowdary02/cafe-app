@@ -11,6 +11,10 @@ const DeliveryRouteMap = dynamic(
     () => import("@/components/maps/DeliveryRouteMap"),
     { ssr: false }
 );
+const LiveLocationSender = dynamic(
+    () => import("@/components/maps/LiveLocationSender"),
+    { ssr: false }
+);
 
 import { ORDER_STATUS_CONFIG } from "@/lib/orderStatus";
 
@@ -166,6 +170,11 @@ export default function DeliveryPage() {
             <Navbar />
 
             <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+                {/* Live GPS sharing — active while at least one order is out for delivery */}
+                <LiveLocationSender
+                    active={orders.some((o) => o.status === "OUT_FOR_DELIVERY")}
+                />
+
                 <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div className="flex items-start gap-4">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-2xl shadow-md shadow-orange-200">

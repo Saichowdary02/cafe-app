@@ -264,9 +264,56 @@ const markCashReceived = async (req, res) => {
     }
 };
 
+/*
+ * POST /api/delivery/location (DELIVERY role)
+ * Body: { "latitude": 17.3908, "longitude": 78.4831 }
+ * The delivery boy's app pushes his GPS position here every ~10 sec
+ * while an order is OUT_FOR_DELIVERY. The JWT identifies which
+ * delivery boy the coordinates belong to (never trust a body ID).
+ * The single row per boy is upserted, so the table always answers
+ * "where is this delivery boy right now?" — no GPS history is kept.
+ */
+const updateMyLocation = async (req, res) => {
+    try {
+        const { latitude, longitude } = req.body;
+
+        // 1. Validate coordinates (same rules as order delivery location)
+        const lat = Number(latitude);
+        const lng = Number(longitude);
+
+        if (
+            latitude === undefined ||
+            longitude === undefined ||
+            !Number.isFinite(lat) ||
+            !Number.isFinite(lng) ||
+            lat < -90 || lat > 90 ||
+            lng < -180 || lng > 180
+        ) {
+            return res.status(400).json({ message: "Invalid coordinates" });
+        }
+
+        // 2. Identify the delivery boy from the JWT
+        const deliveryBoyId = req.user.id;
+
+        // 3. Upsert the latest location (one row per delivery boy)
+        await pool.execute(
+            `INSERT INTO delivery_locations (delivery_boy_id, latitude, longitude)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude)`,
+            [deliveryBoyId, lat, lng]
+        );
+
+        return res.status(200).json({ message: "Location updated" });
+    } catch (error) {
+        console.error("Update delivery location error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 module.exports = {
     getDeliveryOrders,
     assignDeliveryBoy,
     updateDeliveryStatus,
-    markCashReceived
+    markCashReceived,
+    updateMyLocation
 };
