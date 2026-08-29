@@ -6,6 +6,13 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Toast from "@/components/Toast";
 import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
+import dynamic from "next/dynamic";
+
+// Leaflet requires browser APIs — no SSR
+const DeliveryLocationMap = dynamic(
+    () => import("@/components/maps/DeliveryLocationMap"),
+    { ssr: false }
+);
 
 function StatusBadge({ status }) {
     if (status === "PENDING") {
@@ -202,6 +209,11 @@ export default function OrdersPage() {
     const [sortBy, setSortBy] = useState("NEWEST");
     const [receiptOrder, setReceiptOrder] = useState(null);
 
+    // Delivery feature state
+    const [mapOrderId, setMapOrderId] = useState(null); // order whose map is open
+    const [deliveryStaff, setDeliveryStaff] = useState([]); // DELIVERY users (admin)
+    const [assigningId, setAssigningId] = useState(null);
+
     const showToast = (message, type = "success") => {
         setToast({ message, type });
         setTimeout(() => {
@@ -222,6 +234,16 @@ export default function OrdersPage() {
             const loggedInUser = JSON.parse(userData);
             setUser(loggedInUser);
             fetchOrders(token, loggedInUser.role);
+
+            // Admin: fetch delivery boys for assignment
+            if (loggedInUser.role === "ADMIN") {
+                fetch("http://localhost:5000/api/staff?role=DELIVERY", {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                    .then((res) => (res.ok ? res.json() : null))
+                    .then((data) => setDeliveryStaff(data?.staff || []))
+                    .catch((err) => console.error("Failed to fetch delivery staff:", err));
+            }
         } catch (err) {
             console.error(err);
             localStorage.removeItem("user");
@@ -294,6 +316,43 @@ export default function OrdersPage() {
         } finally {
             setLoading(false);
             setRefreshing(false);
+        }
+    };
+
+    const assignDelivery = async (orderId, deliveryBoyId) => {
+        if (!deliveryBoyId) return;
+        try {
+            setAssigningId(orderId);
+            const token = localStorage.getItem("token");
+            const response = await fetch(
+                `http://localhost:5000/api/delivery/orders/${orderId}/assign`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ delivery_boy_id: Number(deliveryBoyId) }),
+                }
+            );
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Assignment failed");
+            setOrders((current) =>
+                current.map((o) =>
+                    o.id === orderId
+                        ? {
+                              ...o,
+                              delivery_boy_id: Number(deliveryBoyId),
+                              delivery_boy_name: data.order?.delivery_boy_name,
+                          }
+                        : o
+                )
+            );
+            showToast(data.message, "success");
+        } catch (err) {
+            showToast(err.message || "Failed to assign delivery", "error");
+        } finally {
+            setAssigningId(null);
         }
     };
 
@@ -1225,6 +1284,72 @@ export default function OrdersPage() {
                                                 status={order.payment_status || "PENDING"}
                                             />
                                         </div>
+
+                                        {/* Delivery Info */}
+                                        {(order.latitude != null || order.delivery_address) && (
+                                            <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+                                                        Delivery
+                                                    </span>
+                                                    {order.latitude != null && (
+                                                        <button
+                                                            onClick={() =>
+                                                                setMapOrderId(mapOrderId === order.id ? null : order.id)
+                                                            }
+                                                            className="cursor-pointer rounded-lg border border-blue-300 bg-white px-2.5 py-1 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50"
+                                                        >
+                                                            {mapOrderId === order.id ? "Hide Map" : "View Map"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {order.delivery_address && (
+                                                    <p className="mt-1 break-words text-xs font-semibold text-blue-900">
+                                                        {order.delivery_address}
+                                                    </p>
+                                                )}
+                                                {order.latitude != null && (
+                                                    <p className="mt-0.5 text-[10px] font-medium text-blue-700">
+                                                        {Number(order.latitude).toFixed(6)},{" "}
+                                                        {Number(order.longitude).toFixed(6)}
+                                                    </p>
+                                                )}
+                                                {order.delivery_boy_name && (
+                                                    <p className="mt-1 text-[10px] font-bold text-emerald-700">
+                                                        Assigned: {order.delivery_boy_name}
+                                                    </p>
+                                                )}
+                                                {user?.role === "ADMIN" && deliveryStaff.length > 0 && (
+                                                    <select
+                                                        value={order.delivery_boy_id || ""}
+                                                        onChange={(e) => assignDelivery(order.id, e.target.value)}
+                                                        disabled={assigningId === order.id}
+                                                        className="mt-2 w-full cursor-pointer rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-stone-700 disabled:opacity-60"
+                                                    >
+                                                        <option value="">
+                                                            {assigningId === order.id
+                                                                ? "Assigning..."
+                                                                : "Assign delivery boy..."}
+                                                        </option>
+                                                        {deliveryStaff.map((d) => (
+                                                            <option key={d.id} value={d.id}>
+                                                                {d.name} (#{d.id})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                                {mapOrderId === order.id && order.latitude != null && (
+                                                    <div className="mt-2">
+                                                        <DeliveryLocationMap
+                                                            latitude={order.latitude}
+                                                            longitude={order.longitude}
+                                                            address={order.delivery_address}
+                                                            height={220}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Cash payment note — USER only, unpaid cash orders */}
                                         {!isStaffOrAdmin &&

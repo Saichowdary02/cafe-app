@@ -67,6 +67,7 @@ export default function Navbar() {
     };
 
     const isAdmin = user?.role === "ADMIN";
+    const isDelivery = user?.role === "DELIVERY";
 
     const isActive = (path) => {
         if (path === "/home") return pathname === "/home" || pathname === "/";
@@ -179,6 +180,23 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                             )}
                         </Link>
+
+                        {/* DELIVERY ONLY */}
+                        {isDelivery && (
+                            <Link
+                                href="/delivery"
+                                className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
+                                    isActive("/delivery")
+                                        ? "bg-orange-50 font-bold text-orange-600 shadow-2xs"
+                                        : "text-stone-600 hover:bg-stone-100/80 hover:text-orange-600"
+                                }`}
+                            >
+                                <span>My Deliveries</span>
+                                {isActive("/delivery") && (
+                                    <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
+                                )}
+                            </Link>
+                        )}
 
                         {/* ADMIN ONLY */}
                         {isAdmin && (

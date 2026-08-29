@@ -10,6 +10,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const billRoutes = require("./routes/billRoutes");
 const staffRoutes = require("./routes/staffRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const deliveryRoutes = require("./routes/deliveryRoutes");
 
 const pool = require("./config/db");
 
@@ -26,6 +27,7 @@ app.use("/api/bill", billRoutes);
 app.use("/api/bill-settings", billRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/delivery", deliveryRoutes);
 // Test server
 app.get("/", (req, res) => {
     res.json({

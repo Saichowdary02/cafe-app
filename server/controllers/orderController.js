@@ -5,10 +5,59 @@ const createOrder = async (req, res) => {
     let connection;
 
     try {
-        const { items, payment_mode } = req.body;
+        const { items, payment_mode, delivery_address, latitude, longitude } = req.body;
 
         // 1. Get logged-in user's ID from JWT
         const userId = req.user.id;
+
+        // 1.05 Delivery location (optional but validated when provided)
+        // latitude/longitude are the authoritative data; address is supplementary.
+        let orderDeliveryAddress = null;
+        let orderLatitude = null;
+        let orderLongitude = null;
+
+        if (
+            delivery_address !== undefined ||
+            latitude !== undefined ||
+            longitude !== undefined
+        ) {
+            if (delivery_address !== undefined && delivery_address !== null) {
+                if (typeof delivery_address !== "string" || delivery_address.trim() === "") {
+                    return res.status(400).json({
+                        message: "Invalid delivery address"
+                    });
+                }
+                if (delivery_address.length > 500) {
+                    return res.status(400).json({
+                        message: "Delivery address must be 500 characters or less"
+                    });
+                }
+                orderDeliveryAddress = delivery_address.trim();
+            }
+
+            const lat = Number(latitude);
+            const lng = Number(longitude);
+
+            // Both coordinates must be provided together and be within valid ranges
+            if (
+                latitude !== undefined || longitude !== undefined
+            ) {
+                if (
+                    latitude === undefined ||
+                    longitude === undefined ||
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lng) ||
+                    lat < -90 || lat > 90 ||
+                    lng < -180 || lng > 180
+                ) {
+                    return res.status(400).json({
+                        message: "Invalid delivery coordinates"
+                    });
+                }
+                orderLatitude = lat;
+                orderLongitude = lng;
+            }
+        }
 
         // 1.1 Payment mode: CASH (default) or ONLINE (Razorpay)
         const orderPaymentMode = payment_mode === "ONLINE" ? "ONLINE" : "CASH";
@@ -85,9 +134,9 @@ const createOrder = async (req, res) => {
         // 6. Create order
         const [orderResult] = await connection.execute(
             `INSERT INTO orders
-            (user_id, total_amount, status, payment_mode, payment_status)
-            VALUES (?, ?, ?, ?, ?)`,
-            [userId, finalGrandTotal, "PENDING", orderPaymentMode, "PENDING"]
+            (user_id, total_amount, status, payment_mode, payment_status, delivery_address, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, finalGrandTotal, "PENDING", orderPaymentMode, "PENDING", orderDeliveryAddress, orderLatitude, orderLongitude]
         );
 
         const orderId = orderResult.insertId;
@@ -121,7 +170,10 @@ const createOrder = async (req, res) => {
                 breakdown: billBreakdown,
                 status: "PENDING",
                 payment_mode: orderPaymentMode,
-                payment_status: "PENDING"
+                payment_status: "PENDING",
+                delivery_address: orderDeliveryAddress,
+                latitude: orderLatitude,
+                longitude: orderLongitude
             }
         });
 
@@ -161,6 +213,9 @@ const getMyOrders = async (req, res) => {
                 status,
                 payment_mode,
                 payment_status,
+                delivery_address,
+                latitude,
+                longitude,
                 created_at
              FROM orders
              WHERE user_id = ?
@@ -217,10 +272,17 @@ const getAllOrders = async (req, res) => {
                 o.status,
                 o.payment_mode,
                 o.payment_status,
+                o.delivery_address,
+                o.latitude,
+                o.longitude,
+                o.delivery_boy_id,
+                db.name AS delivery_boy_name,
                 o.created_at
              FROM orders o
              INNER JOIN users u
                 ON o.user_id = u.id
+             LEFT JOIN users db
+                ON o.delivery_boy_id = db.id
              WHERE o.created_at >= NOW() - INTERVAL 24 HOUR
              ORDER BY o.created_at DESC`
         );

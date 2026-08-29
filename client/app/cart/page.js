@@ -3,12 +3,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import chaiImg from "@/app/images/chai.png";
 import coffeeImg from "@/app/images/coffee.png";
 import snackImg from "@/app/images/snack.png";
 import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
+
+// Leaflet touches browser APIs — load the picker without SSR
+const DeliveryLocationPicker = dynamic(
+    () => import("@/components/maps/DeliveryLocationPicker"),
+    { ssr: false }
+);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -65,6 +72,8 @@ export default function CartPage() {
     const [placingOrder, setPlacingOrder] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [error, setError] = useState("");
+    const [deliveryLocation, setDeliveryLocation] = useState(null); // {latitude, longitude, address}
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
 
 
     // Load cart from localStorage & fetch bill settings
@@ -231,7 +240,10 @@ export default function CartPage() {
 
                 body: JSON.stringify({
                     items: orderItems,
-                    payment_mode: paymentMode
+                    payment_mode: paymentMode,
+                    delivery_address: deliveryLocation?.address || undefined,
+                    latitude: deliveryLocation?.latitude,
+                    longitude: deliveryLocation?.longitude
                 })
             }
         );
@@ -827,9 +839,50 @@ export default function CartPage() {
                                     </div>
                                 )}
 
+                                {/* Delivery Location Summary */}
+                                {deliveryLocation ? (
+                                    <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 text-xs font-medium text-emerald-900">
+                                                <p className="text-sm font-black">Delivery Location Confirmed</p>
+                                                <p className="mt-1">Lat: {deliveryLocation.latitude.toFixed(6)}</p>
+                                                <p>Lng: {deliveryLocation.longitude.toFixed(6)}</p>
+                                                {deliveryLocation.address && (
+                                                    <p className="mt-1 break-words">{deliveryLocation.address}</p>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowLocationPicker(true)}
+                                                disabled={placingOrder}
+                                                className="shrink-0 cursor-pointer rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
+                                            >
+                                                Change
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowLocationPicker(true)}
+                                        disabled={placingOrder}
+                                        className="mt-6 w-full cursor-pointer rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/50 px-5 py-4 text-sm font-bold text-orange-700 transition hover:bg-orange-50 disabled:opacity-60"
+                                    >
+                                        📍 Select Delivery Location on Map
+                                    </button>
+                                )}
+
                                 {/* Place Order Button */}
                                 <button
-                                    onClick={() => setShowPaymentModal(true)}
+                                    onClick={() => {
+                                        // Delivery location must be confirmed first
+                                        if (!deliveryLocation) {
+                                            setError(
+                                                "Please select your delivery location before placing the order."
+                                            );
+                                            setShowLocationPicker(true);
+                                            return;
+                                        }
+                                        setShowPaymentModal(true);
+                                    }}
                                     disabled={placingOrder || cart.length === 0}
                                     className="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -866,6 +919,23 @@ export default function CartPage() {
                         </div>
                     )}
 
+
+                    {/* Delivery Location Picker Modal */}
+                    {showLocationPicker && (
+                        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/60 p-4 backdrop-blur-sm">
+                            <div className="mx-auto my-8 w-full max-w-2xl">
+                                <DeliveryLocationPicker
+                                    confirming={placingOrder}
+                                    onCancel={() => setShowLocationPicker(false)}
+                                    onConfirm={(location) => {
+                                        setDeliveryLocation(location);
+                                        setShowLocationPicker(false);
+                                        setError("");
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Payment Method Modal */}
                     {showPaymentModal && (

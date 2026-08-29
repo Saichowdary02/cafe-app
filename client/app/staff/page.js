@@ -17,7 +17,8 @@ export default function StaffPage() {
 
     // Add staff modal state
     const [showAddModal, setShowAddModal] = useState(false);
-    const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
+    const [addForm, setAddForm] = useState({ name: "", email: "", password: "", role: "STAFF" });
+    const [teamFilter, setTeamFilter] = useState("STAFF"); // STAFF | DELIVERY
     const [addLoading, setAddLoading] = useState(false);
 
     // Delete confirmation state
@@ -34,9 +35,12 @@ export default function StaffPage() {
     const fetchAllStaff = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("http://localhost:5000/api/staff", {
-                headers: { Authorization: `Bearer ${getToken()}` }
-            });
+            const res = await fetch(
+                `http://localhost:5000/api/staff?role=${teamFilter}`,
+                {
+                    headers: { Authorization: `Bearer ${getToken()}` }
+                }
+            );
             if (!res.ok) throw new Error("Failed to fetch staff");
             const data = await res.json();
             setStaff(data.staff);
@@ -45,7 +49,7 @@ export default function StaffPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [teamFilter]);
 
     // Guard: admin-only
     useEffect(() => {
@@ -80,7 +84,7 @@ export default function StaffPage() {
             setLoading(true);
             try {
                 const res = await fetch(
-                    `http://localhost:5000/api/staff/search?q=${encodeURIComponent(searchQuery.trim())}`,
+                    `http://localhost:5000/api/staff/search?q=${encodeURIComponent(searchQuery.trim())}&role=${teamFilter}`,
                     { headers: { Authorization: `Bearer ${getToken()}` } }
                 );
                 if (!res.ok) throw new Error("Search failed");
@@ -116,7 +120,7 @@ export default function StaffPage() {
             if (!res.ok) throw new Error(data.message || "Failed to create staff");
             showToast(`Staff member "${addForm.name}" created successfully!`, "success");
             setShowAddModal(false);
-            setAddForm({ name: "", email: "", password: "" });
+            setAddForm({ name: "", email: "", password: "", role: "STAFF" });
             fetchAllStaff();
         } catch (err) {
             showToast(err.message, "error");
@@ -244,6 +248,27 @@ export default function StaffPage() {
                                     Clear
                                 </button>
                             )}
+                        </div>
+
+                        {/* Team Filter Toggle: Staff vs Delivery */}
+                        <div className="mt-4 inline-flex rounded-xl border border-stone-200 bg-white p-1 shadow-sm">
+                            {[
+                                { value: "STAFF", label: "👥 Kitchen / Counter Staff" },
+                                { value: "DELIVERY", label: "🛵 Delivery Boys" },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setTeamFilter(opt.value)}
+                                    className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+                                        teamFilter === opt.value
+                                            ? "bg-orange-600 text-white shadow-sm"
+                                            : "text-stone-600 hover:bg-stone-50"
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -393,6 +418,18 @@ export default function StaffPage() {
                                     required
                                     className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
                                 />
+                                {/* Role */}
+                                <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-stone-500">
+                                    Role
+                                </label>
+                                <select
+                                    value={addForm.role}
+                                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                                    className="mt-1.5 w-full cursor-pointer rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
+                                >
+                                    <option value="STAFF">Kitchen / Counter Staff</option>
+                                    <option value="DELIVERY">Delivery Boy</option>
+                                </select>
                             </div>
 
                             <div>
