@@ -12,6 +12,13 @@ const createRazorpayOrder = async (req, res) => {
         const userId = req.user.id;
         const { order_id } = req.body;
 
+        // Kitchen and delivery members cannot initiate payments
+        if (req.user.role === "KITCHEN" || req.user.role === "DELIVERY") {
+            return res.status(403).json({
+                message: "Kitchen and delivery members cannot place orders"
+            });
+        }
+
         if (!order_id) {
             return res.status(400).json({
                 message: "order_id is required"

@@ -10,6 +10,14 @@ const createOrder = async (req, res) => {
         // 1. Get logged-in user's ID from JWT
         const userId = req.user.id;
 
+        // 1.02 Only customers (and admins) can place orders.
+        // KITCHEN and DELIVERY members are operational roles, not customers.
+        if (req.user.role === "KITCHEN" || req.user.role === "DELIVERY") {
+            return res.status(403).json({
+                message: "Kitchen and delivery members cannot place orders"
+            });
+        }
+
         // 1.05 Delivery location (optional but validated when provided)
         // latitude/longitude are the authoritative data; address is supplementary.
         let orderDeliveryAddress = null;
@@ -136,7 +144,7 @@ const createOrder = async (req, res) => {
             `INSERT INTO orders
             (user_id, total_amount, status, payment_mode, payment_status, delivery_address, latitude, longitude)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, finalGrandTotal, "PENDING", orderPaymentMode, "PENDING", orderDeliveryAddress, orderLatitude, orderLongitude]
+            [userId, finalGrandTotal, "ORDER_PLACED", orderPaymentMode, "PENDING", orderDeliveryAddress, orderLatitude, orderLongitude]
         );
 
         const orderId = orderResult.insertId;
@@ -340,21 +348,32 @@ const updateOrderStatus = async (req, res) => {
             });
         }
 
-        // 4. Only allow these statuses
+        // 4. Only allow these statuses (strict one-step flow)
+        // Kitchen control: ORDER_PLACED → CONFIRMED → PREPARING → READY_FOR_PICKUP
+        // OUT_FOR_DELIVERY / DELIVERED are normally set by the assigned delivery boy
+        // via PATCH /api/delivery/orders/:id/status — but an ADMIN may also set them
+        // here, provided a delivery boy is already assigned to the order.
+        const isAdmin = req.user.role === "ADMIN";
         const allowedStatuses = [
+            "CONFIRMED",
             "PREPARING",
-            "COMPLETED"
+            "READY_FOR_PICKUP",
+            // Admin can also drive the delivery leg
+            ...(isAdmin ? ["OUT_FOR_DELIVERY", "DELIVERED"] : [])
         ];
 
         if (!allowedStatuses.includes(status)) {
             return res.status(400).json({
-                message: "Invalid status"
+                message:
+                    status === "OUT_FOR_DELIVERY" || status === "DELIVERED"
+                        ? "Delivery statuses can only be updated by the assigned delivery boy"
+                        : "Invalid status"
             });
         }
 
         // 5. Find the order
         const [orders] = await pool.execute(
-            `SELECT id, status, payment_status
+            `SELECT id, status, payment_mode, payment_status, delivery_boy_id
              FROM orders
              WHERE id = ?`,
             [id]
@@ -368,23 +387,21 @@ const updateOrderStatus = async (req, res) => {
 
         const order = orders[0];
 
-        // 6. Validate status transition
+        // 6. Validate status transition (one step at a time)
 
-        // PENDING → PREPARING
-        if (
-            order.status === "PENDING" &&
-            status !== "PREPARING"
-        ) {
+        // ORDER_PLACED → CONFIRMED
+        if (order.status === "ORDER_PLACED" && status !== "CONFIRMED") {
             return res.status(400).json({
-                message: "Pending order can only be moved to PREPARING"
+                message: "Order placed can only be moved to CONFIRMED"
             });
         }
 
-        // Payment must be successful before accepting/preparing an order.
-        // Online payments become PAID automatically via Razorpay verification;
-        // cash payments must be confirmed by staff first.
+        // ONLINE orders must be PAID before accepting (Razorpay verification).
+        // CASH orders are cash-on-delivery: the delivery boy collects and marks
+        // the cash as received after completing the delivery.
         if (
-            order.status === "PENDING" &&
+            order.status === "ORDER_PLACED" &&
+            order.payment_mode === "ONLINE" &&
             (order.payment_status || "PENDING") !== "PAID"
         ) {
             return res.status(400).json({
@@ -392,20 +409,46 @@ const updateOrderStatus = async (req, res) => {
             });
         }
 
-        // PREPARING → COMPLETED
-        if (
-            order.status === "PREPARING" &&
-            status !== "COMPLETED"
-        ) {
+        // CONFIRMED → PREPARING
+        if (order.status === "CONFIRMED" && status !== "PREPARING") {
             return res.status(400).json({
-                message: "Preparing order can only be moved to COMPLETED"
+                message: "Confirmed order can only be moved to PREPARING"
             });
         }
 
-        // COMPLETED cannot be changed
-        if (order.status === "COMPLETED") {
+        // PREPARING → READY_FOR_PICKUP
+        if (order.status === "PREPARING" && status !== "READY_FOR_PICKUP") {
             return res.status(400).json({
-                message: "Completed order cannot be changed"
+                message: "Preparing order can only be moved to READY_FOR_PICKUP"
+            });
+        }
+
+        // READY_FOR_PICKUP → OUT_FOR_DELIVERY (delivery boy only, via delivery API)
+        if (order.status === "READY_FOR_PICKUP" && status !== "OUT_FOR_DELIVERY") {
+            return res.status(400).json({
+                message: "Ready for pickup order can only be moved to OUT_FOR_DELIVERY"
+            });
+        }
+
+        // ── Admin-driven delivery leg (must stay in sync with the assigned delivery boy) ──
+        // OUT_FOR_DELIVERY only from READY_FOR_PICKUP
+        if (status === "OUT_FOR_DELIVERY" && order.status !== "READY_FOR_PICKUP") {
+            return res.status(400).json({
+                message: "Only a Ready for Pickup order can be moved to OUT_FOR_DELIVERY"
+            });
+        }
+
+        // DELIVERED only from OUT_FOR_DELIVERY
+        if (status === "DELIVERED" && order.status !== "OUT_FOR_DELIVERY") {
+            return res.status(400).json({
+                message: "Only an Out for Delivery order can be marked DELIVERED"
+            });
+        }
+
+        // Admin can only move the delivery leg of an order that has a delivery boy assigned
+        if ((status === "OUT_FOR_DELIVERY" || status === "DELIVERED") && !order.delivery_boy_id) {
+            return res.status(400).json({
+                message: "Assign a delivery boy before updating delivery statuses"
             });
         }
 

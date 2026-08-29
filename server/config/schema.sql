@@ -12,14 +12,14 @@ USE cafe_app;
 
 -- ============================================================
 -- 1. Users Table
---    Roles: USER (customer), STAFF (kitchen/counter), ADMIN, DELIVERY
+--    Roles: USER (customer), KITCHEN, ADMIN, DELIVERY
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     name        VARCHAR(100)  NOT NULL,
     email       VARCHAR(191)  NOT NULL UNIQUE,
     password    VARCHAR(255)  NOT NULL,
-    role        ENUM('USER', 'STAFF', 'ADMIN', 'DELIVERY') NOT NULL DEFAULT 'USER',
+    role        ENUM('USER', 'KITCHEN', 'ADMIN', 'DELIVERY') NOT NULL DEFAULT 'USER',
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- ============================================================
 -- 3. Orders Table
---    Status flow: PENDING → PREPARING → COMPLETED
+--    Status flow: ORDER_PLACED → CONFIRMED → PREPARING → READY_FOR_PICKUP → OUT_FOR_DELIVERY → DELIVERED
 --    Delivery fields: delivery_address / latitude / longitude (customer
 --    selected at checkout), delivery_boy_id (assigned by ADMIN).
 -- ============================================================
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS orders (
     id           INT AUTO_INCREMENT PRIMARY KEY,
     user_id      INT           NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
-    status       ENUM('PENDING', 'PREPARING', 'READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
+    status       ENUM('ORDER_PLACED', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED') NOT NULL DEFAULT 'ORDER_PLACED',
     payment_mode   ENUM('CASH', 'ONLINE') NOT NULL DEFAULT 'CASH',
     payment_status ENUM('PENDING', 'PAID', 'FAILED') NOT NULL DEFAULT 'PENDING',
     delivery_address VARCHAR(500) NULL,
@@ -141,7 +141,7 @@ VALUES
 
 -- 7.1 Allow the DELIVERY role on users
 ALTER TABLE users
-    MODIFY role ENUM('USER', 'STAFF', 'ADMIN', 'DELIVERY') NOT NULL DEFAULT 'USER';
+    MODIFY role ENUM('USER', 'KITCHEN', 'ADMIN', 'DELIVERY') NOT NULL DEFAULT 'USER';
 
 -- 7.2 Delivery location + assignment on orders
 ALTER TABLE orders
@@ -151,8 +151,8 @@ ALTER TABLE orders
     ADD COLUMN delivery_boy_id  INT NULL;
 
 ALTER TABLE orders
-    MODIFY status ENUM('PENDING', 'PREPARING', 'READY_FOR_DELIVERY', 'OUT_FOR_DELIVERY', 'COMPLETED')
-        NOT NULL DEFAULT 'PENDING';
+    MODIFY status ENUM('ORDER_PLACED', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED')
+        NOT NULL DEFAULT 'ORDER_PLACED';
 
 ALTER TABLE orders
     ADD CONSTRAINT fk_orders_delivery_boy

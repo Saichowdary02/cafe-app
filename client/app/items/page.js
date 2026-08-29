@@ -170,7 +170,7 @@ function ItemsContent() {
         return matchesCategory && matchesSearch;
     });
 
-    const isStaffOrAdmin = user?.role === "STAFF" || user?.role === "ADMIN";
+    const isStaffOrAdmin = user?.role === "KITCHEN" || user?.role === "ADMIN";
 
     const totalCartItems = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
     const totalCartAmount = cart.reduce(
@@ -185,7 +185,7 @@ function ItemsContent() {
             : [selectedCategory];
 
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
             <div className="min-h-screen pb-24">
                 <Navbar />
 
@@ -631,3 +631,5 @@ export default function ItemsPage() {
         </Suspense>
     );
 }
+
+

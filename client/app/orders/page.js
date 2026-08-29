@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Toast from "@/components/Toast";
 import { calculateBillBreakdown, DEFAULT_BILL_SETTINGS } from "@/lib/billCalculator";
+import { ORDER_STATUS_FLOW, ORDER_STATUS_CONFIG, NEXT_ORDER_STATUS } from "@/lib/orderStatus";
 import dynamic from "next/dynamic";
 
 // Leaflet requires browser APIs — no SSR
@@ -15,38 +16,28 @@ const DeliveryLocationMap = dynamic(
 );
 
 function StatusBadge({ status }) {
-    if (status === "PENDING") {
+    const config = ORDER_STATUS_CONFIG[status];
+
+    if (!config) {
         return (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-3 py-1 text-xs font-bold tracking-wide text-amber-800 shadow-xs">
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                PENDING
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700">
+                {status}
             </span>
         );
     }
-    if (status === "PREPARING") {
-        return (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/80 bg-blue-50 px-3 py-1 text-xs font-bold tracking-wide text-blue-800 shadow-xs">
-                <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                </span>
-                PREPARING
-            </span>
-        );
-    }
-    if (status === "COMPLETED") {
-        return (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50 px-3 py-1 text-xs font-bold tracking-wide text-emerald-800 shadow-xs">
-                <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+
+    const isFinal = status === "DELIVERED";
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold tracking-wide shadow-xs ${config.badge}`}>
+            {isFinal ? (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                COMPLETED
-            </span>
-        );
-    }
-    return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-bold text-stone-700">
-            {status}
+            ) : (
+                <span className={`h-2 w-2 rounded-full ${config.circle.split(" ")[1]} animate-pulse`} />
+            )}
+            {config.label.toUpperCase()}
         </span>
     );
 }
@@ -121,15 +112,11 @@ function getRelativeTime(utcTimestamp) {
 }
 
 function OrderProgressBar({ status }) {
-    const steps = [
-        { label: "Placed", key: "PENDING" },
-        { label: "Kitchen", key: "PREPARING" },
-        { label: "Delivered", key: "COMPLETED" },
-    ];
-
-    let currentStepIndex = 0;
-    if (status === "PREPARING") currentStepIndex = 1;
-    if (status === "COMPLETED") currentStepIndex = 2;
+    const steps = ORDER_STATUS_FLOW;
+    const foundIndex = steps.findIndex((s) => s.value === status);
+    const currentStepIndex = foundIndex >= 0 ? foundIndex : 0;
+    const isFinal = status === "DELIVERED";
+    const currentConfig = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.ORDER_PLACED;
 
     return (
         <div className="mt-3.5 px-1">
@@ -139,12 +126,8 @@ function OrderProgressBar({ status }) {
 
                 {/* Active progress line */}
                 <div
-                    className={`absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500 ${currentStepIndex === 0
-                            ? "w-[10%] bg-amber-500"
-                            : currentStepIndex === 1
-                                ? "w-[50%] bg-blue-500"
-                                : "w-full bg-emerald-500"
-                        }`}
+                    className={`absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500 ${currentConfig.bar}`}
+                    style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
                 />
 
                 {steps.map((step, idx) => {
@@ -153,16 +136,14 @@ function OrderProgressBar({ status }) {
 
                     let circleClass = "border-stone-300 bg-white text-stone-400";
                     if (isDone) {
-                        if (currentStepIndex === 0) circleClass = "border-amber-500 bg-amber-500 text-white shadow-sm shadow-amber-500/30";
-                        else if (currentStepIndex === 1 && idx === 1) circleClass = "border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30";
-                        else if (currentStepIndex >= 1 && idx === 0) circleClass = "border-emerald-500 bg-emerald-500 text-white";
-                        else if (currentStepIndex === 2) circleClass = "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30";
+                        if (idx < currentStepIndex) circleClass = "border-emerald-500 bg-emerald-500 text-white";
+                        else circleClass = currentConfig.circle;
                     }
 
                     return (
-                        <div key={step.label} className="relative z-10 flex flex-col items-center">
+                        <div key={step.value} className="relative z-10 flex flex-col items-center">
                             <div
-                                className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all duration-300 ${circleClass} ${isCurrent && status !== "COMPLETED" ? "scale-110 ring-2 ring-orange-200" : ""
+                                className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all duration-300 ${circleClass} ${isCurrent && !isFinal ? "scale-110 ring-2 ring-orange-200" : ""
                                     }`}
                             >
                                 {isDone && idx < currentStepIndex ? (
@@ -170,7 +151,7 @@ function OrderProgressBar({ status }) {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                 ) : (
-                                    idx + 1
+                                    isCurrent ? step.icon : idx + 1
                                 )}
                             </div>
                             <span
@@ -188,6 +169,50 @@ function OrderProgressBar({ status }) {
                 })}
             </div>
         </div>
+    );
+}
+
+function StepActionButton({ order, updatingId, onAdvance, role }) {
+    const nextStatus = NEXT_ORDER_STATUS[order.status];
+    const config = ORDER_STATUS_CONFIG[nextStatus];
+
+    if (!config) return null;
+
+    // Kitchen can only advance up to READY_FOR_PICKUP —
+    // OUT_FOR_DELIVERY / DELIVERED are handled by the assigned delivery boy,
+    // or by an ADMIN (with a delivery boy assigned) directly from this board.
+    const kitchenStatuses = ["CONFIRMED", "PREPARING", "READY_FOR_PICKUP"];
+    const adminStatuses = ["OUT_FOR_DELIVERY", "DELIVERED"];
+    const allowed =
+        kitchenStatuses.includes(nextStatus) ||
+        (role === "ADMIN" && adminStatuses.includes(nextStatus));
+    if (!allowed) {
+        return null;
+    }
+
+    return (
+        <button
+            onClick={() => onAdvance(order.id, nextStatus)}
+            disabled={updatingId === order.id}
+            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-orange-700 hover:to-amber-700 hover:shadow-md hover:shadow-orange-500/30 active:scale-95 disabled:opacity-50"
+        >
+            {updatingId === order.id ? (
+                <span className="flex items-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Updating...
+                </span>
+            ) : (
+                <>
+                    <span>{config.icon} Move to {config.label}</span>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </>
+            )}
+        </button>
     );
 }
 
@@ -235,8 +260,8 @@ export default function OrdersPage() {
             setUser(loggedInUser);
             fetchOrders(token, loggedInUser.role);
 
-            // Admin: fetch delivery boys for assignment
-            if (loggedInUser.role === "ADMIN") {
+            // Admin/Kitchen: fetch delivery boys for assignment
+            if (loggedInUser.role === "ADMIN" || loggedInUser.role === "KITCHEN") {
                 fetch("http://localhost:5000/api/staff?role=DELIVERY", {
                     headers: { Authorization: `Bearer ${token}` },
                 })
@@ -277,7 +302,7 @@ export default function OrdersPage() {
             const activeRole = role || user?.role;
 
             const endpoint =
-                activeRole === "STAFF" || activeRole === "ADMIN"
+                activeRole === "KITCHEN" || activeRole === "ADMIN"
                     ? "http://localhost:5000/api/orders"
                     : "http://localhost:5000/api/orders/my-orders";
 
@@ -387,10 +412,9 @@ export default function OrdersPage() {
                 )
             );
 
-            if (newStatus === "PREPARING") {
-                showToast(`Order #${orderId} moved to Preparing! 👨‍🍳`, "success");
-            } else if (newStatus === "COMPLETED") {
-                showToast(`Order #${orderId} marked as Completed! 🎉`, "success");
+            const config = ORDER_STATUS_CONFIG[newStatus];
+            if (config) {
+                showToast(`${config.icon} Order #${orderId} moved to ${config.label}!`, "success");
             } else {
                 showToast(`Order #${orderId} updated to ${newStatus}`, "success");
             }
@@ -403,7 +427,7 @@ export default function OrdersPage() {
     };
 
     const isStaffOrAdmin =
-        user?.role === "STAFF" ||
+        user?.role === "KITCHEN" ||
         user?.role === "ADMIN";
 
     // Staff/Admin confirms cash was received for an order
@@ -450,11 +474,18 @@ export default function OrdersPage() {
     // Summary Metrics
     const stats = useMemo(() => {
         const total = orders.length;
-        const pending = orders.filter((o) => o.status === "PENDING").length;
-        const preparing = orders.filter((o) => o.status === "PREPARING").length;
-        const completed = orders.filter((o) => o.status === "COMPLETED").length;
+        const countBy = (s) => orders.filter((o) => o.status === s).length;
         const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-        return { total, pending, preparing, completed, totalRevenue };
+        return {
+            total,
+            placed: countBy("ORDER_PLACED"),
+            confirmed: countBy("CONFIRMED"),
+            preparing: countBy("PREPARING"),
+            ready: countBy("READY_FOR_PICKUP"),
+            out: countBy("OUT_FOR_DELIVERY"),
+            delivered: countBy("DELIVERED"),
+            totalRevenue,
+        };
     }, [orders]);
 
     // Filter and Sort Orders
@@ -462,7 +493,10 @@ export default function OrdersPage() {
         return orders
             .filter((order) => {
                 // Status Tab Filter
-                if (statusFilter !== "ALL" && order.status !== statusFilter) {
+                if (statusFilter === "IN_PROGRESS" && order.status === "DELIVERED") {
+                    return false;
+                }
+                if (statusFilter !== "ALL" && statusFilter !== "IN_PROGRESS" && order.status !== statusFilter)  {
                     return false;
                 }
 
@@ -879,7 +913,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Dashboard Stats Overview Cards */}
-                <div className={`mb-8 ${isStaffOrAdmin ? "grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4" : "flex items-stretch justify-between gap-6"}`}>
+                <div className={`mb-8 ${isStaffOrAdmin ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4" : "flex items-stretch justify-between gap-6"}`}>
                     {/* Total Orders Card */}
                     <div
                         onClick={() => setStatusFilter("ALL")}
@@ -914,85 +948,63 @@ export default function OrdersPage() {
                                 <li className="flex items-start gap-1.5">
                                     <span className="text-orange-500">•</span>
                                     <span>
-                                        Orders start as <span className="font-bold text-stone-700">Pending</span> → after payment verification & staff acceptance they move <span className="font-bold text-stone-700">In Kitchen</span> → once delivered they're <span className="font-bold text-stone-700">Completed</span>.
+                                        Our kitchen team prepares your order and moves it through <span className="font-bold text-stone-700">Order Placed → Confirmed → Preparing → Ready for Pickup</span>.
                                     </span>
                                 </li>
                                 <li className="flex items-start gap-1.5">
                                     <span className="text-orange-500">•</span>
                                     <span>
-                                        Track the live status on each order card below. If a status hasn't updated, press the <span className="font-bold text-orange-600">Refresh</span> button in the upper right.
+                                        Once your order is <span className="font-bold text-stone-700">Ready for Pickup</span>, a delivery partner is assigned — they update it to <span className="font-bold text-stone-700">Out for Delivery</span> and finally <span className="font-bold text-stone-700">Delivered</span>.
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-orange-500">•</span>
+                                    <span>
+                                        Track the live status on each order card below. If a status hasn&apos;t updated, press the <span className="font-bold text-orange-600">Refresh</span> button in the upper right.
                                     </span>
                                 </li>
                             </ul>
                         </div>
                     )}
 
-                    {/* Admin/Staff Only Metrics (Pending, In Kitchen, Completed) */}
+                    {/* Admin/Staff Only Metrics (Total, Pending, Delivered) */}
                     {isStaffOrAdmin && (
                         <>
-                            {/* Pending Orders Card */}
+                            {/* Pending Orders Card (all not yet delivered) */}
                             <div
-                                onClick={() => setStatusFilter(statusFilter === "PENDING" ? "ALL" : "PENDING")}
-                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "PENDING"
-                                        ? "border-amber-400 bg-amber-50/90 ring-2 ring-amber-400/40"
-                                        : "border-amber-200/80 bg-amber-50/50 hover:border-amber-300"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold tracking-wide uppercase text-amber-800">
-                                        Pending
-                                    </span>
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                                        ⏳
-                                    </span>
-                                </div>
-                                <div className="mt-2 flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-amber-900 sm:text-3xl">
-                                        {stats.pending}
-                                    </span>
-                                    {stats.pending > 0 && (
-                                        <span className="inline-flex items-center rounded-full bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                                            Needs action
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Preparing Orders Card */}
-                            <div
-                                onClick={() => setStatusFilter(statusFilter === "PREPARING" ? "ALL" : "PREPARING")}
-                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "PREPARING"
+                                onClick={() => setStatusFilter(statusFilter === "IN_PROGRESS" ? "ALL" : "IN_PROGRESS")}
+                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "IN_PROGRESS"
                                         ? "border-blue-400 bg-blue-50/90 ring-2 ring-blue-400/40"
                                         : "border-blue-200/80 bg-blue-50/50 hover:border-blue-300"
                                     }`}
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold tracking-wide uppercase text-blue-800">
-                                        In Kitchen
+                                        Pending
                                     </span>
                                     <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                                        👨‍🍳
+                                        ⏳
                                     </span>
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-black text-blue-900 sm:text-3xl">
-                                        {stats.preparing}
+                                        {stats.total - stats.delivered}
                                     </span>
-                                    <span className="text-xs font-medium text-blue-600">preparing</span>
+                                    <span className="text-xs font-medium text-blue-600">in progress</span>
                                 </div>
                             </div>
 
-                            {/* Completed Card */}
+                            {/* Delivered Card */}
                             <div
-                                onClick={() => setStatusFilter(statusFilter === "COMPLETED" ? "ALL" : "COMPLETED")}
-                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "COMPLETED"
+                                onClick={() => setStatusFilter(statusFilter === "DELIVERED" ? "ALL" : "DELIVERED")}
+                                className={`cursor-pointer relative overflow-hidden rounded-2xl border p-4 shadow-xs backdrop-blur-sm transition-all hover:shadow-md ${statusFilter === "DELIVERED"
                                         ? "border-emerald-400 bg-emerald-50/90 ring-2 ring-emerald-400/40"
                                         : "border-emerald-200/80 bg-emerald-50/50 hover:border-emerald-300"
                                     }`}
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold tracking-wide uppercase text-emerald-800">
-                                        Completed
+                                        Delivered
                                     </span>
                                     <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                                         ✅
@@ -1000,7 +1012,7 @@ export default function OrdersPage() {
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-black text-emerald-900 sm:text-3xl">
-                                        {stats.completed}
+                                        {stats.delivered}
                                     </span>
                                     <span className="text-xs font-medium text-emerald-600">delivered</span>
                                 </div>
@@ -1026,44 +1038,23 @@ export default function OrdersPage() {
                             </span>
                         </button>
 
-                        <button
-                            onClick={() => setStatusFilter("PENDING")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "PENDING"
-                                    ? "bg-amber-500 text-white shadow-xs"
-                                    : "bg-amber-50 text-amber-800 border border-amber-200/60 hover:bg-amber-100"
-                                }`}
-                        >
-                            <span>Pending</span>
-                            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "PENDING" ? "bg-amber-700 text-white" : "bg-amber-200 text-amber-900"}`}>
-                                {stats.pending}
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setStatusFilter("PREPARING")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "PREPARING"
-                                    ? "bg-blue-600 text-white shadow-xs"
-                                    : "bg-blue-50 text-blue-800 border border-blue-200/60 hover:bg-blue-100"
-                                }`}
-                        >
-                            <span>Preparing</span>
-                            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "PREPARING" ? "bg-blue-800 text-white" : "bg-blue-200 text-blue-900"}`}>
-                                {stats.preparing}
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setStatusFilter("COMPLETED")}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === "COMPLETED"
-                                    ? "bg-emerald-600 text-white shadow-xs"
-                                    : "bg-emerald-50 text-emerald-800 border border-emerald-200/60 hover:bg-emerald-100"
-                                }`}
-                        >
-                            <span>Completed</span>
-                            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === "COMPLETED" ? "bg-emerald-800 text-white" : "bg-emerald-200 text-emerald-900"}`}>
-                                {stats.completed}
-                            </span>
-                        </button>
+                        {[{ value: "IN_PROGRESS", label: "In Progress", count: stats.total - stats.delivered }, { value: "DELIVERED", label: "Delivered", count: stats.delivered }].map((s) => (
+                            <button
+                                key={s.value}
+                                onClick={() => setStatusFilter(statusFilter === s.value ? "ALL" : s.value)}
+                                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${statusFilter === s.value
+                                        ? s.value === "DELIVERED"
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "bg-blue-600 text-white shadow-xs"
+                                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                                    }`}
+                            >
+                                <span>{s.label}</span>
+                                <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === s.value ? "bg-black/25 text-white" : "bg-white/70"}`}>
+                                    {s.count}
+                                </span>
+                            </button>
+                        ))}
                     </div>
 
                     {/* Search & Sort Controls */}
@@ -1237,11 +1228,17 @@ export default function OrdersPage() {
                                 >
                                     {/* Top Glow Accent */}
                                     <div
-                                        className={`absolute top-0 left-0 right-0 h-1.5 ${order.status === "PENDING"
+                                        className={`absolute top-0 left-0 right-0 h-1.5 ${order.status === "ORDER_PLACED"
                                                 ? "bg-linear-to-r from-amber-400 to-orange-400"
-                                                : order.status === "PREPARING"
-                                                    ? "bg-linear-to-r from-blue-400 to-indigo-500"
-                                                    : "bg-linear-to-r from-emerald-400 to-teal-500"
+                                                : order.status === "CONFIRMED"
+                                                    ? "bg-linear-to-r from-lime-400 to-green-500"
+                                                    : order.status === "PREPARING"
+                                                        ? "bg-linear-to-r from-blue-400 to-indigo-500"
+                                                        : order.status === "READY_FOR_PICKUP"
+                                                            ? "bg-linear-to-r from-violet-400 to-purple-500"
+                                                            : order.status === "OUT_FOR_DELIVERY"
+                                                                ? "bg-linear-to-r from-orange-400 to-red-500"
+                                                                : "bg-linear-to-r from-emerald-400 to-teal-500"
                                             }`}
                                     />
 
@@ -1319,7 +1316,10 @@ export default function OrdersPage() {
                                                         Assigned: {order.delivery_boy_name}
                                                     </p>
                                                 )}
-                                                {user?.role === "ADMIN" && deliveryStaff.length > 0 && (
+                                                {isStaffOrAdmin && deliveryStaff.length > 0 &&
+                                                    ["READY_FOR_PICKUP", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"].includes(
+                                                        (order.status || "").toUpperCase()
+                                                    ) && (
                                                     <select
                                                         value={order.delivery_boy_id || ""}
                                                         onChange={(e) => assignDelivery(order.id, e.target.value)}
@@ -1358,7 +1358,7 @@ export default function OrdersPage() {
                                                 <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-orange-200/70 bg-orange-50/70 px-3 py-2 text-[11px] font-medium text-orange-700">
                                                     <span>💵</span>
                                                     <span>
-                                                        Cash payment pending — our staff/admin will verify it on handover and your status will be updated to PAID.
+                                                        Cash on delivery — please keep the exact amount ready. Our delivery partner will collect the cash at your doorstep.
                                                     </span>
                                                 </p>
                                             )}
@@ -1476,8 +1476,11 @@ export default function OrdersPage() {
                                         {/* Actions — STAFF / ADMIN only */}
                                         {isStaffOrAdmin && (
                                             <div className="mt-4 space-y-2">
-                                                {/* Cash collection — only for unpaid cash orders */}
-                                                {(order.payment_mode || "CASH") === "CASH" &&
+                                                {/* Cash collection — ADMIN only, only for unpaid cash orders.
+                                                    Delivery boys collect cash from their own assigned
+                                                    orders on the Delivery page instead. */}
+                                                {user?.role === "ADMIN" &&
+                                                    (order.payment_mode || "CASH") === "CASH" &&
                                                     (order.payment_status || "PENDING") === "PENDING" && (
                                                         <button
                                                             onClick={() => markCashReceived(order.id)}
@@ -1503,37 +1506,21 @@ export default function OrdersPage() {
                                                         </button>
                                                     )}
 
-                                                {/* Accept & Start Preparing — only after payment is successful.
+                                                {/* Advance to next step — only after payment is successful.
                                                     Online orders become PAID automatically via Razorpay verification;
                                                     cash orders must first be marked "Cash Received" above. */}
-                                                {order.status === "PENDING" &&
-                                                    (order.payment_status || "PENDING") === "PAID" && (
-                                                    <button
-                                                        onClick={() => updateStatus(order.id, "PREPARING")}
-                                                        disabled={updatingId === order.id}
-                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-orange-700 hover:to-amber-700 hover:shadow-md hover:shadow-orange-500/30 active:scale-95 disabled:opacity-50"
-                                                    >
-                                                        {updatingId === order.id ? (
-                                                            <span className="flex items-center gap-2">
-                                                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                                </svg>
-                                                                Updating...
-                                                            </span>
-                                                        ) : (
-                                                            <>
-                                                                <span>👨‍🍳 Accept & Start Preparing</span>
-                                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                                                </svg>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                )}
+                                                {order.status === "ORDER_PLACED" &&
+                                                    ((order.payment_mode || "CASH") === "CASH" || (order.payment_status || "PENDING") === "PAID") && (
+                                                        <StepActionButton
+                                                            order={order}
+                                                            updatingId={updatingId}
+                                                            onAdvance={updateStatus}
+                                                        role={user?.role}
+                                                        />
+                                                    )}
 
-                                                {order.status === "PENDING" &&
-                                                    (order.payment_status || "PENDING") !== "PAID" && (
+                                                {order.status === "ORDER_PLACED" &&
+                                                    ((order.payment_mode || "CASH") === "ONLINE" && (order.payment_status || "PENDING") !== "PAID") && (
                                                         <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 py-2 text-xs font-bold text-amber-800">
                                                             <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
@@ -1542,32 +1529,17 @@ export default function OrdersPage() {
                                                         </div>
                                                     )}
 
-                                                {order.status === "PREPARING" && (
-                                                    <button
-                                                        onClick={() => updateStatus(order.id, "COMPLETED")}
-                                                        disabled={updatingId === order.id}
-                                                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-md hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50"
-                                                    >
-                                                        {updatingId === order.id ? (
-                                                            <span className="flex items-center gap-2">
-                                                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                                </svg>
-                                                                Updating...
-                                                            </span>
-                                                        ) : (
-                                                            <>
-                                                                <span>✅ Mark as Delivered</span>
-                                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                )}
+                                                {order.status !== "ORDER_PLACED" &&
+                                                    NEXT_ORDER_STATUS[order.status] && (
+                                                        <StepActionButton
+                                                            order={order}
+                                                            updatingId={updatingId}
+                                                            onAdvance={updateStatus}
+                                                        role={user?.role}
+                                                        />
+                                                    )}
 
-                                                {order.status === "COMPLETED" && (
+{order.status === "DELIVERED" && (
                                                     <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 py-2 text-xs font-bold text-emerald-800">
                                                         <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

@@ -20,22 +20,23 @@ router.get(
 router.get(
     "/",
     authMiddleware,
-    authorizeRoles("STAFF","ADMIN"),
+    authorizeRoles("KITCHEN","ADMIN"),
     getAllOrders
 );
 // Staff/Admin update order status
 router.patch(
     "/:id/status",
     authMiddleware,
-    authorizeRoles("STAFF", "ADMIN"),
+    authorizeRoles("KITCHEN", "ADMIN"),
     updateOrderStatus
 );
 
-// Staff/Admin confirm cash payment received
+// Admin confirms cash payment received (delivery boys use /api/delivery/orders/:id/payment-status
+// which is restricted to their own assigned orders)
 router.patch(
     "/:id/payment-status",
     authMiddleware,
-    authorizeRoles("STAFF", "ADMIN"),
+    authorizeRoles("ADMIN"),
     updatePaymentStatus
 );
 

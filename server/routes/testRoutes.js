@@ -19,7 +19,7 @@ router.get("/user", authenticateToken, (req, res) => {
 router.get(
     "/staff",
     authenticateToken,
-    authorizeRoles("STAFF"),
+    authorizeRoles("KITCHEN"),
     (req, res) => {
         res.json({
             message: "Welcome Staff",

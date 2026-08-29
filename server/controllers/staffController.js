@@ -2,12 +2,12 @@ const bcrypt = require("bcrypt");
 const pool = require("../config/db");
 
 // Roles that ADMIN can manage through the staff APIs
-const MANAGEABLE_ROLES = ["STAFF", "DELIVERY"];
+const MANAGEABLE_ROLES = ["KITCHEN", "DELIVERY"];
 
 const resolveRoleFilter = (requestedRole) =>
     requestedRole && MANAGEABLE_ROLES.includes(requestedRole)
         ? requestedRole
-        : "STAFF";
+        : "KITCHEN";
 
 // GET /api/staff — get all staff members (optional ?role=DELIVERY)
 const getAllStaff = async (req, res) => {
@@ -24,7 +24,7 @@ const getAllStaff = async (req, res) => {
     }
 };
 
-// GET /api/staff/search?q=<name_or_id>&role=STAFF|DELIVERY — search by name or ID
+// GET /api/staff/search?q=<name_or_id>&role=KITCHEN|DELIVERY — search by name or ID
 const searchStaff = async (req, res) => {
     try {
         const { q } = req.query;
@@ -59,7 +59,7 @@ const searchStaff = async (req, res) => {
     }
 };
 
-// GET /api/staff/:id?role=STAFF|DELIVERY — get a single member by ID
+// GET /api/staff/:id?role=KITCHEN|DELIVERY — get a single member by ID
 const getStaffById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -95,11 +95,11 @@ const createStaff = async (req, res) => {
             return res.status(400).json({ message: "Password must be at least 6 characters" });
         }
 
-        // Role: STAFF (default) or DELIVERY
+        // Role: KITCHEN (default) or DELIVERY
         const role =
             requestedRole && MANAGEABLE_ROLES.includes(requestedRole)
                 ? requestedRole
-                : "STAFF";
+                : "KITCHEN";
 
         // Check if email already exists
         const [existing] = await pool.execute(
@@ -136,13 +136,13 @@ const createStaff = async (req, res) => {
     }
 };
 
-// DELETE /api/staff/:id?role=STAFF|DELIVERY — delete by ID (role-guarded)
+// DELETE /api/staff/:id?role=KITCHEN|DELIVERY — delete by ID (role-guarded)
 const deleteStaff = async (req, res) => {
     try {
         const { id } = req.params;
         const roleFilter = resolveRoleFilter(req.query.role);
 
-        // Only delete if role is STAFF/DELIVERY (safety guard)
+        // Only delete if role is KITCHEN/DELIVERY (safety guard)
         const [existing] = await pool.execute(
             "SELECT id FROM users WHERE id = ? AND role = ?",
             [id, roleFilter]
@@ -172,3 +172,4 @@ module.exports = {
     createStaff,
     deleteStaff
 };
+

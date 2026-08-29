@@ -42,9 +42,12 @@ const getDashboardStats = async (req, res) => {
         const [statsRows] = await pool.execute(`
             SELECT
                 COUNT(*)                                             AS total_orders,
-                COALESCE(SUM(CASE WHEN o.status = 'PENDING'    THEN 1 ELSE 0 END), 0) AS pending,
-                COALESCE(SUM(CASE WHEN o.status = 'PREPARING'  THEN 1 ELSE 0 END), 0) AS preparing,
-                COALESCE(SUM(CASE WHEN o.status = 'COMPLETED'  THEN 1 ELSE 0 END), 0) AS completed,
+                COALESCE(SUM(CASE WHEN o.status = 'ORDER_PLACED'      THEN 1 ELSE 0 END), 0) AS order_placed,
+                COALESCE(SUM(CASE WHEN o.status = 'CONFIRMED'         THEN 1 ELSE 0 END), 0) AS confirmed,
+                COALESCE(SUM(CASE WHEN o.status = 'PREPARING'         THEN 1 ELSE 0 END), 0) AS preparing,
+                COALESCE(SUM(CASE WHEN o.status = 'READY_FOR_PICKUP'  THEN 1 ELSE 0 END), 0) AS ready_for_pickup,
+                COALESCE(SUM(CASE WHEN o.status = 'OUT_FOR_DELIVERY'  THEN 1 ELSE 0 END), 0) AS out_for_delivery,
+                COALESCE(SUM(CASE WHEN o.status = 'DELIVERED'         THEN 1 ELSE 0 END), 0) AS delivered,
                 COALESCE(SUM(o.total_amount), 0)                     AS total_revenue,
                 COALESCE(AVG(o.total_amount), 0)                     AS avg_order_value
             FROM orders o
@@ -113,10 +116,13 @@ const getDashboardStats = async (req, res) => {
 
         return res.status(200).json({
             period: activePeriod,
-            total_orders:    Number(stats.total_orders),
-            pending:         Number(stats.pending),
-            preparing:       Number(stats.preparing),
-            completed:       Number(stats.completed),
+            total_orders:      Number(stats.total_orders),
+            order_placed:      Number(stats.order_placed),
+            confirmed:         Number(stats.confirmed),
+            preparing:         Number(stats.preparing),
+            ready_for_pickup:  Number(stats.ready_for_pickup),
+            out_for_delivery:  Number(stats.out_for_delivery),
+            delivered:         Number(stats.delivered),
             total_revenue:   Number(Number(stats.total_revenue).toFixed(2)),
             avg_order_value: Number(Number(stats.avg_order_value).toFixed(2)),
             top_products:    topProducts.map((p) => ({

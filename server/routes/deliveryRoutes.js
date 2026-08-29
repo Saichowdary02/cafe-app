@@ -5,7 +5,8 @@ const router = express.Router();
 const {
     getDeliveryOrders,
     assignDeliveryBoy,
-    updateDeliveryStatus
+    updateDeliveryStatus,
+    markCashReceived
 } = require("../controllers/deliveryController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -27,11 +28,19 @@ router.patch(
     updateDeliveryStatus
 );
 
-// Admin: assign a delivery boy to an order
+// Delivery boy: collect cash for his assigned cash-on-delivery order
+router.patch(
+    "/orders/:id/payment-status",
+    authMiddleware,
+    authorizeRoles("DELIVERY"),
+    markCashReceived
+);
+
+// Admin: assign a delivery boy to an order (kitchen can hand over ready orders too)
 router.patch(
     "/orders/:id/assign",
     authMiddleware,
-    authorizeRoles("ADMIN"),
+    authorizeRoles("ADMIN", "KITCHEN"),
     assignDeliveryBoy
 );
 

@@ -68,6 +68,10 @@ export default function Navbar() {
 
     const isAdmin = user?.role === "ADMIN";
     const isDelivery = user?.role === "DELIVERY";
+    const isKitchen = user?.role === "KITCHEN";
+    // Kitchen & Delivery don't browse the menu or order — they get work pages only
+    const canOrder = !isKitchen && !isDelivery;
+    const homeHref = isDelivery ? "/delivery" : isKitchen ? "/orders" : "/home";
 
     const isActive = (path) => {
         if (path === "/home") return pathname === "/home" || pathname === "/";
@@ -94,7 +98,7 @@ export default function Navbar() {
                 <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
                     {/* Brand Logo */}
                     <Link
-                        href="/home"
+                        href={homeHref}
                         className="flex items-center gap-2.5 text-gray-900 group"
                     >
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm shadow-orange-500/20 group-hover:bg-orange-700 transition">
@@ -125,6 +129,7 @@ export default function Navbar() {
 
                     {/* Navigation Links & Profile */}
                     <nav className="flex  items-center gap-2 sm:gap-4">
+                        {canOrder && (
                         <Link
                             href="/home"
                             className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
@@ -138,7 +143,9 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                             )}
                         </Link>
+                        )}
 
+                        {canOrder && (
                         <Link
                             href="/items"
                             className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
@@ -152,7 +159,9 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                             )}
                         </Link>
+                        )}
 
+                        {canOrder && (
                         <Link
                             href="/cart"
                             className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
@@ -166,7 +175,10 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                             )}
                         </Link>
+                        )}
 
+                        {/* Orders — kitchen works here; USER/ADMIN track orders here */}
+                        {!isDelivery && (
                         <Link
                             href="/orders"
                             className={`relative rounded-xl px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
@@ -180,6 +192,7 @@ export default function Navbar() {
                                 <span className="absolute -bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-orange-600" />
                             )}
                         </Link>
+                        )}
 
                         {/* DELIVERY ONLY */}
                         {isDelivery && (

@@ -133,7 +133,7 @@ export default function HomePage() {
         fetchMinPrices();
     }, []);
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
             <div className="min-h-screen pb-16">
                 <Navbar />
 

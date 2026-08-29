@@ -66,10 +66,19 @@ export default function LoginPage() {
             showToast("Login successful!", "success");
 
             /*
-             * Go to Home after short delay to view toast
+             * Route each role to its own landing page:
+             * DELIVERY → /delivery, KITCHEN → /orders, USER/ADMIN → /home
              */
+            const landingPage =
+                data.user?.role === "DELIVERY"
+                    ? "/delivery"
+                    : data.user?.role === "KITCHEN"
+                        ? "/orders"
+                        : "/home";
+
+            /* Go to the role's landing page after short delay to view toast */
             setTimeout(() => {
-                router.push("/home");
+                router.push(landingPage);
             }, 1000);
 
         } catch (error) {

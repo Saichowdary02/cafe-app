@@ -550,7 +550,7 @@ export default function CartPage() {
 
         return (
 
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
 
                 <div className="min-h-screen">
 
@@ -575,7 +575,7 @@ export default function CartPage() {
 
     return (
 
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
 
             <div className="min-h-screen">
 
@@ -870,10 +870,9 @@ export default function CartPage() {
                                     </button>
                                 )}
 
-                                {/* Place Order Button */}
+                                {/* Place Order Button — enabled only after a delivery location is selected */}
                                 <button
                                     onClick={() => {
-                                        // Delivery location must be confirmed first
                                         if (!deliveryLocation) {
                                             setError(
                                                 "Please select your delivery location before placing the order."
@@ -883,13 +882,22 @@ export default function CartPage() {
                                         }
                                         setShowPaymentModal(true);
                                     }}
-                                    disabled={placingOrder || cart.length === 0}
-                                    className="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={placingOrder || cart.length === 0 || !deliveryLocation}
+                                    title={
+                                        deliveryLocation
+                                            ? undefined
+                                            : "Select your delivery location on the map to enable this button"
+                                    }
+                                    className="mt-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-md shadow-orange-500/25 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-orange-600 disabled:hover:shadow-md"
                                 >
                                     {placingOrder ? (
                                         <>
                                             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                                             <span>Placing Order...</span>
+                                        </>
+                                    ) : !deliveryLocation ? (
+                                        <>
+                                            <span>📍 Select Delivery Location to Place Order</span>
                                         </>
                                     ) : (
                                         <>

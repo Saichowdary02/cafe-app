@@ -10,13 +10,15 @@ const {
     deleteStaff
 } = require("../controllers/staffController");
 
-// All routes require authentication and ADMIN role
-router.use(authenticateToken, authorizeRoles("ADMIN"));
+// All routes require authentication.
+// READ access: ADMIN + KITCHEN (kitchen needs the delivery-boy list to assign orders)
+// WRITE access (create/delete members): ADMIN only
+router.use(authenticateToken);
 
-router.get("/search", searchStaff);         // GET /api/staff/search?q=...
-router.get("/", getAllStaff);               // GET /api/staff
-router.get("/:id", getStaffById);          // GET /api/staff/:id
-router.post("/", createStaff);             // POST /api/staff
-router.delete("/:id", deleteStaff);        // DELETE /api/staff/:id
+router.get("/search", authorizeRoles("ADMIN", "KITCHEN"), searchStaff);  // GET /api/staff/search?q=...
+router.get("/", authorizeRoles("ADMIN", "KITCHEN"), getAllStaff);        // GET /api/staff
+router.get("/:id", authorizeRoles("ADMIN", "KITCHEN"), getStaffById);    // GET /api/staff/:id
+router.post("/", authorizeRoles("ADMIN"), createStaff);                  // POST /api/staff
+router.delete("/:id", authorizeRoles("ADMIN"), deleteStaff);             // DELETE /api/staff/:id
 
 module.exports = router;
